@@ -1434,13 +1434,17 @@ export const useSettingsStore = create<SettingsState>()(
                 }
               }
 
-              // LLM auto-select: only on true first load (no provider selected yet)
+              // LLM auto-select: when no provider is set, or current provider has no
+              // API key and is not server-configured (e.g. default 'openai' with no key)
               let autoProviderId: ProviderId | undefined;
               let autoModelId: string | undefined;
-              if (!state.providerId && !state.modelId) {
+              const currentProviderUsable =
+                state.providerId &&
+                (newProvidersConfig[state.providerId as ProviderId]?.isServerConfigured ||
+                  !!newProvidersConfig[state.providerId as ProviderId]?.apiKey);
+              if (!currentProviderUsable) {
                 for (const [pid, cfg] of Object.entries(newProvidersConfig)) {
                   if (cfg.isServerConfigured) {
-                    // Prefer server-restricted models, fall back to built-in list
                     const serverModels = cfg.serverModels;
                     const modelId = serverModels?.length
                       ? serverModels[0]
