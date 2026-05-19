@@ -113,7 +113,7 @@ export default function LoginPage() {
     <div style={styles.container}>
       <div style={{ ...styles.card, ...(loaded ? styles.cardLoaded : {}) }}>
         {/* Left panel */}
-        <div style={styles.left}>
+        <div className="login-left" style={styles.left}>
           <h2 style={{ ...styles.welcomeTitle, ...(titleVisible ? styles.slideIn : {}) }}>
             Welcome to the OpenMAIC
           </h2>
@@ -208,6 +208,9 @@ export default function LoginPage() {
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
         @keyframes spin { to{transform:rotate(360deg)} }
         @keyframes slideIn { from{opacity:0;transform:translateX(-30px)} to{opacity:1;transform:translateX(0)} }
+        @media (max-width: 768px) {
+          .login-left { display: none !important; }
+        }
       `}</style>
     </div>
   );
