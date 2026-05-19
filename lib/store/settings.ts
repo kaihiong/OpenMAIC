@@ -733,8 +733,8 @@ export const useSettingsStore = create<SettingsState>()(
 
       return {
         // Initial state (use migrated data if available)
-        providerId: migratedData?.providerId || ('' as ProviderId),
-        modelId: migratedData?.modelId || '',
+        providerId: migratedData?.providerId || 'azure-openai',
+        modelId: migratedData?.modelId || 'gpt-5.4-mini',
         thinkingConfigs: pruneThinkingConfigs(
           migratedData?.thinkingConfigs || {},
           initialProvidersConfig,
