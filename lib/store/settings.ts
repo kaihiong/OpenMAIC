@@ -393,8 +393,8 @@ const getDefaultPDFConfig = () => ({
 
 // Initialize default Image config
 const getDefaultImageConfig = () => ({
-  imageProviderId: 'seedream' as ImageProviderId,
-  imageModelId: 'doubao-seedream-5-0-260128',
+  imageProviderId: 'azure-openai-image' as ImageProviderId,
+  imageModelId: 'gpt-image-1.5',
   imageProvidersConfig: {
     seedream: { apiKey: '', baseUrl: '', enabled: false },
     'openai-image': { apiKey: '', baseUrl: '', enabled: false },
