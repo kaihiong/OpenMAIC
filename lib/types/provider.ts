@@ -7,6 +7,7 @@
  */
 export type BuiltInProviderId =
   | 'openai'
+  | 'azure-openai'
   | 'anthropic'
   | 'google'
   | 'deepseek'
@@ -32,7 +33,7 @@ export type ProviderId = BuiltInProviderId | `custom-${string}`;
 /**
  * Provider API types
  */
-export type ProviderType = 'openai' | 'anthropic' | 'google';
+export type ProviderType = 'openai' | 'azure-openai' | 'anthropic' | 'google';
 
 export type ThinkingControlType =
   | 'none'

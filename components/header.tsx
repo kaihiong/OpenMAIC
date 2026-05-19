@@ -174,6 +174,7 @@ export function Header({ currentSceneTitle }: HeaderProps) {
               <Settings className="w-4 h-4 group-hover:rotate-90 transition-transform duration-500" />
             </button>
           </div>
+
         </div>
 
         {/* Export Dropdown */}

@@ -398,6 +398,7 @@ const getDefaultImageConfig = () => ({
   imageProvidersConfig: {
     seedream: { apiKey: '', baseUrl: '', enabled: false },
     'openai-image': { apiKey: '', baseUrl: '', enabled: false },
+    'azure-openai-image': { apiKey: '', baseUrl: '', enabled: false },
     'qwen-image': { apiKey: '', baseUrl: '', enabled: false },
     'nano-banana': { apiKey: '', baseUrl: '', enabled: false },
     'minimax-image': { apiKey: '', baseUrl: '', enabled: false },

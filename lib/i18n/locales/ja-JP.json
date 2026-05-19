@@ -948,6 +948,7 @@
     "imageModel": "画像生成モデル",
     "providerSeedream": "Seedream（ByteDance）",
     "providerOpenAIImage": "OpenAI Image",
+    "providerAzureOpenAIImage": "Azure OpenAI Image",
     "providerQwenImage": "Qwen Image（Alibaba）",
     "providerNanoBanana": "Nano Banana（Gemini）",
     "providerMiniMaxImage": "MiniMax Image",

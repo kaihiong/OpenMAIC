@@ -23,8 +23,10 @@ import {
   Sparkles,
   Atom,
   X,
+  LogOut,
 } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
+import { useNieAuth } from '@/lib/hooks/use-nie-auth';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { createLogger } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
@@ -81,6 +83,7 @@ function HomePage() {
   const { t } = useI18n();
   const { theme, setTheme } = useTheme();
   const router = useRouter();
+  const { nieAuthEnabled, logout } = useNieAuth();
   const [form, setForm] = useState<FormState>(initialFormState);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<
@@ -472,6 +475,20 @@ function HomePage() {
             <Settings className="w-4 h-4 group-hover:rotate-90 transition-transform duration-500" />
           </button>
         </div>
+
+        {/* Logout Button */}
+        {nieAuthEnabled && (
+          <>
+            <div className="w-[1px] h-4 bg-gray-200 dark:bg-gray-700" />
+            <button
+              onClick={logout}
+              title="Log out"
+              className="p-2 rounded-full text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 hover:shadow-sm transition-all"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </>
+        )}
       </div>
       <SettingsDialog
         open={settingsOpen}
@@ -848,13 +865,13 @@ function isCustomAvatar(src: string) {
 
 function GreetingBar() {
   const { t } = useI18n();
+  const { user: nieUser } = useNieAuth();
   const avatar = useUserProfileStore((s) => s.avatar);
   const nickname = useUserProfileStore((s) => s.nickname);
   const bio = useUserProfileStore((s) => s.bio);
   const setAvatar = useUserProfileStore((s) => s.setAvatar);
   const setNickname = useUserProfileStore((s) => s.setNickname);
   const setBio = useUserProfileStore((s) => s.setBio);
-
   const [open, setOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -863,7 +880,7 @@ function GreetingBar() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const displayName = nickname || t('profile.defaultNickname');
+  const displayName = nieUser?.name ?? nickname ?? t('profile.defaultNickname');
 
   // Click-outside to collapse
   useEffect(() => {
@@ -880,6 +897,7 @@ function GreetingBar() {
   }, [open]);
 
   const startEditName = () => {
+    if (nieUser) return; // AD name is not editable
     setNameDraft(nickname);
     setEditingName(true);
     setTimeout(() => nameInputRef.current?.focus(), 50);
@@ -941,9 +959,11 @@ function GreetingBar() {
             <div className="size-8 rounded-full overflow-hidden ring-[1.5px] ring-border/30 group-hover:ring-violet-400/60 dark:group-hover:ring-violet-400/40 transition-all duration-300">
               <img src={avatar} alt="" className="size-full object-cover" />
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full bg-white dark:bg-slate-800 border border-border/40 flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity">
-              <Pencil className="size-[7px] text-muted-foreground/70" />
-            </div>
+            {!nieUser && (
+              <div className="absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full bg-white dark:bg-slate-800 border border-border/40 flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity">
+                <Pencil className="size-[7px] text-muted-foreground/70" />
+              </div>
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <Tooltip>
@@ -1045,7 +1065,9 @@ function GreetingBar() {
                       <span className="text-[13px] font-semibold text-foreground/85 group-hover/name:text-foreground transition-colors">
                         {displayName}
                       </span>
-                      <Pencil className="size-2.5 text-muted-foreground/30 opacity-0 group-hover/name:opacity-100 transition-opacity" />
+                      {!nieUser && (
+                        <Pencil className="size-2.5 text-muted-foreground/30 opacity-0 group-hover/name:opacity-100 transition-opacity" />
+                      )}
                     </span>
                   )}
                 </div>
@@ -1115,6 +1137,7 @@ function GreetingBar() {
                   rows={2}
                   className="resize-none border-border/40 bg-transparent min-h-[72px] !text-[13px] !leading-relaxed placeholder:!text-[11px] placeholder:!leading-relaxed focus-visible:ring-1 focus-visible:ring-border/60"
                 />
+
               </div>
             </div>
           </motion.div>

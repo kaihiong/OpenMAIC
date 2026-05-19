@@ -169,6 +169,7 @@ function getASRProviderName(providerId: ASRProviderId, t: (key: string) => strin
 const IMAGE_PROVIDER_NAMES: Record<ImageProviderId, string> = {
   seedream: 'providerSeedream',
   'openai-image': 'providerOpenAIImage',
+  'azure-openai-image': 'providerAzureOpenAIImage',
   'qwen-image': 'providerQwenImage',
   'nano-banana': 'providerNanoBanana',
   'minimax-image': 'providerMiniMaxImage',
@@ -179,6 +180,7 @@ const IMAGE_PROVIDER_NAMES: Record<ImageProviderId, string> = {
 const IMAGE_PROVIDER_ICONS: Record<ImageProviderId, string> = {
   seedream: '/logos/doubao.svg',
   'openai-image': '/logos/openai.svg',
+  'azure-openai-image': '/logos/openai.svg',
   'qwen-image': '/logos/bailian.svg',
   'nano-banana': '/logos/gemini.svg',
   'minimax-image': '/logos/minimax.svg',

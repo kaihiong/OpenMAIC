@@ -39,6 +39,7 @@ interface ServerConfig {
 
 const LLM_ENV_MAP: Record<string, string> = {
   OPENAI: 'openai',
+  AZURE_OPENAI: 'azure-openai',
   ANTHROPIC: 'anthropic',
   GOOGLE: 'google',
   DEEPSEEK: 'deepseek',
@@ -84,6 +85,7 @@ const PDF_ENV_MAP: Record<string, string> = {
 
 const IMAGE_ENV_MAP: Record<string, string> = {
   IMAGE_OPENAI: 'openai-image',
+  IMAGE_AZURE_OPENAI: 'azure-openai-image',
   IMAGE_SEEDREAM: 'seedream',
   IMAGE_QWEN_IMAGE: 'qwen-image',
   IMAGE_NANO_BANANA: 'nano-banana',
@@ -212,9 +214,34 @@ function loadEnvSection(
 
 const DEFAULT_FILENAME = 'server-providers.yml';
 const OPENAI_IMAGE_PROVIDER_ID = 'openai-image';
+const AZURE_OPENAI_IMAGE_PROVIDER_ID = 'azure-openai-image';
 
 /** Cache keyed by YAML filename (empty string = default file). */
 const _configs: Map<string, ServerConfig> = new Map();
+
+function applyAzureOpenAIImageFallback(
+  imageConfig: Record<string, ServerProviderEntry>,
+  yamlImageSection: Record<string, Partial<ServerProviderEntry>> | undefined,
+): Record<string, ServerProviderEntry> {
+  if (imageConfig[AZURE_OPENAI_IMAGE_PROVIDER_ID]) return imageConfig;
+
+  const apiKey = process.env.AZURE_OPENAI_API_KEY;
+  const baseUrl = process.env.AZURE_OPENAI_BASE_URL;
+  if (!apiKey || !baseUrl) return imageConfig;
+
+  const yamlEntry = yamlImageSection?.[AZURE_OPENAI_IMAGE_PROVIDER_ID];
+  const modelsStr = process.env.IMAGE_AZURE_OPENAI_MODELS || process.env.AZURE_OPENAI_IMAGE_MODELS;
+  const models = modelsStr
+    ? modelsStr.split(',').map((m) => m.trim()).filter(Boolean)
+    : yamlEntry?.models;
+
+  imageConfig[AZURE_OPENAI_IMAGE_PROVIDER_ID] = {
+    apiKey,
+    baseUrl: yamlEntry?.baseUrl || process.env.IMAGE_AZURE_OPENAI_BASE_URL || baseUrl,
+    models,
+  };
+  return imageConfig;
+}
 
 function applyOpenAIImageFallback(
   imageConfig: Record<string, ServerProviderEntry>,
@@ -237,10 +264,13 @@ function applyOpenAIImageFallback(
 }
 
 function buildConfig(yamlData: YamlData): ServerConfig {
-  const image = applyOpenAIImageFallback(
-    loadEnvSection(IMAGE_ENV_MAP, yamlData.image, {
-      keylessProviders: new Set(['lemonade']),
-    }),
+  const image = applyAzureOpenAIImageFallback(
+    applyOpenAIImageFallback(
+      loadEnvSection(IMAGE_ENV_MAP, yamlData.image, {
+        keylessProviders: new Set(['lemonade']),
+      }),
+      yamlData.image,
+    ),
     yamlData.image,
   );
 

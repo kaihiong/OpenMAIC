@@ -958,6 +958,7 @@
     "mineruCloudApiKeyPlaceholder": "輸入 MinerU Cloud API 金鑰",
     "providerMinerUCloud": "MinerU (雲端)",
     "providerOpenAIImage": "OpenAI 圖片",
+    "providerAzureOpenAIImage": "Azure OpenAI 圖片",
     "providerVoxCPMTTS": "VoxCPM2",
     "recording": "錄音中...",
     "startRecording": "開始錄音",

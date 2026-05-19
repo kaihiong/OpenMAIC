@@ -147,6 +147,30 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
     ],
   },
 
+  'azure-openai': {
+    id: 'azure-openai',
+    name: 'Azure OpenAI',
+    type: 'azure-openai',
+    // Set AZURE_OPENAI_BASE_URL to your resource endpoint, e.g.:
+    // https://your-resource.openai.azure.com
+    defaultBaseUrl: undefined,
+    requiresApiKey: true,
+    icon: '/logos/azure.svg',
+    models: [
+      {
+        id: 'gpt-5.4-mini',
+        name: 'GPT-5.4 Mini (Azure)',
+        contextWindow: 128000,
+        outputWindow: 16384,
+        capabilities: {
+          streaming: true,
+          tools: true,
+          vision: true,
+        },
+      },
+    ],
+  },
+
   anthropic: {
     id: 'anthropic',
     name: 'Claude',
@@ -1379,6 +1403,41 @@ export function getModel(config: ModelConfig): ModelWithInfo {
       model = shouldUseOpenAIResponsesApi(config.providerId, config.modelId)
         ? openai.responses(config.modelId)
         : openai.chat(config.modelId);
+      break;
+    }
+
+    case 'azure-openai': {
+      // Azure AI Foundry style: model is in the request body, base URL is
+      // {resource}/openai/v1 — no deployment path, no api-version param needed.
+      // Only difference from stock OpenAI: auth uses api-key header, not Bearer.
+      const azureFetch: typeof globalThis.fetch = async (url, init) => {
+        // Normalize headers to a plain Record so mutation is reliable regardless
+        // of whether the SDK passes Headers, [string,string][], or a plain object
+        const rawHeaders = init?.headers;
+        const normalizedHeaders: Record<string, string> = {};
+        if (rawHeaders instanceof Headers) {
+          rawHeaders.forEach((v, k) => { normalizedHeaders[k] = v; });
+        } else if (Array.isArray(rawHeaders)) {
+          for (const [k, v] of rawHeaders) normalizedHeaders[k] = v;
+        } else if (rawHeaders) {
+          Object.assign(normalizedHeaders, rawHeaders);
+        }
+        // Case-insensitive swap: Authorization: Bearer → api-key
+        const authKey = Object.keys(normalizedHeaders).find(
+          (k) => k.toLowerCase() === 'authorization',
+        );
+        if (authKey) {
+          normalizedHeaders['api-key'] = normalizedHeaders[authKey].replace(/^Bearer /, '');
+          delete normalizedHeaders[authKey];
+        }
+        return globalThis.fetch(url.toString(), { ...init, headers: normalizedHeaders });
+      };
+      const azureClient = createOpenAI({
+        apiKey: effectiveApiKey,
+        baseURL: effectiveBaseUrl,
+        fetch: azureFetch,
+      });
+      model = azureClient.chat(config.modelId);
       break;
     }
 
