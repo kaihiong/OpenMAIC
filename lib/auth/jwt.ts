@@ -13,8 +13,8 @@ export interface SessionUser {
 export const COOKIE_NAME = 'openmaic_session';
 const EXPIRY_SECONDS = 8 * 60 * 60; // 8 hours
 
-function b64url(buf: ArrayBuffer): string {
-  const bytes = new Uint8Array(buf);
+function b64url(buf: ArrayBuffer | Uint8Array): string {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
   let binary = '';
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
@@ -63,10 +63,11 @@ export async function verifyJWT(token: string): Promise<SessionUser | null> {
   const [header, payload, sig] = parts;
 
   try {
+    const sigBytes = b64urlDecode(sig);
     const valid = await crypto.subtle.verify(
       'HMAC',
       await hmacKey(secret),
-      b64urlDecode(sig),
+      sigBytes.buffer as ArrayBuffer,
       new TextEncoder().encode(`${header}.${payload}`),
     );
     if (!valid) return null;

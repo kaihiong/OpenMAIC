@@ -8,5 +8,5 @@ export async function GET() {
   if (!token) return apiError('UNAUTHORIZED', 401, 'Not authenticated');
   const user = await verifyJWT(token);
   if (!user) return apiError('UNAUTHORIZED', 401, 'Session expired');
-  return apiSuccess(user);
+  return apiSuccess(user as unknown as Record<string, unknown>);
 }
