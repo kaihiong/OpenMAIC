@@ -733,7 +733,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       return {
         // Initial state (use migrated data if available)
-        providerId: migratedData?.providerId || 'openai',
+        providerId: migratedData?.providerId || ('' as ProviderId),
         modelId: migratedData?.modelId || '',
         thinkingConfigs: pruneThinkingConfigs(
           migratedData?.thinkingConfigs || {},
