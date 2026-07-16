@@ -4,6 +4,88 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-06-28
+
+### License
+
+- Relicense the project from AGPL-3.0 to MIT
+
+### Breaking Changes
+
+- Remove `allow-same-origin` from the interactive `srcDoc` iframe sandbox for tighter isolation; interactive widgets that relied on same-origin access may need updates [#726](https://github.com/THU-MAIC/OpenMAIC/pull/726) (by @sebastiondev)
+- Restructure the slide DSL and renderer into standalone `@openmaic/*` packages consumed by the app; the inline DSL shim is removed [#707](https://github.com/THU-MAIC/OpenMAIC/pull/707) [#738](https://github.com/THU-MAIC/OpenMAIC/pull/738)
+
+### Features
+
+- **Project-Based Learning (PBL) v2** — Add the PBL v2 core schema and generation path [#795](https://github.com/THU-MAIC/OpenMAIC/pull/795) (by @cosarah), runtime APIs with classroom UI [#799](https://github.com/THU-MAIC/OpenMAIC/pull/799) (by @cosarah), in-timeline discussion authoring [#798](https://github.com/THU-MAIC/OpenMAIC/pull/798), auto-retry for transient scene-generation failures [#788](https://github.com/THU-MAIC/OpenMAIC/pull/788) (by @YizukiAme), and a planner eval harness [#803](https://github.com/THU-MAIC/OpenMAIC/pull/803) [#805](https://github.com/THU-MAIC/OpenMAIC/pull/805) (by @cosarah)
+- **Edit with AI** — Add a Pro-mode editor agent that edits generated slides from a chat prompt [#777](https://github.com/THU-MAIC/OpenMAIC/pull/777)
+- **`@openmaic/*` SDK on npm** — Publish the DSL, renderer, and importer SDK family to npm [#778](https://github.com/THU-MAIC/OpenMAIC/pull/778) [#780](https://github.com/THU-MAIC/OpenMAIC/pull/780), introduce the `maic-import`/`maic-renderer` workspace packages [#668](https://github.com/THU-MAIC/OpenMAIC/pull/668) (by @xuyuanwei678), and promote the Stage/Scene lesson skeleton into `@maic/dsl` [#740](https://github.com/THU-MAIC/OpenMAIC/pull/740)
+- Add optional per-stage LLM model routing [#745](https://github.com/THU-MAIC/OpenMAIC/pull/745)
+- Add GLM-5.2 and Kimi K2.7 Code [#774](https://github.com/THU-MAIC/OpenMAIC/pull/774), and Qwen3.7 Plus and Qwen3.7 Max [#753](https://github.com/THU-MAIC/OpenMAIC/pull/753), to the model registry
+- Add a vocational-learning task engine with procedural skill widgets [#685](https://github.com/THU-MAIC/OpenMAIC/pull/685) (by @jackefn)
+- Add Korean (ko-KR) translation [#733](https://github.com/THU-MAIC/OpenMAIC/pull/733) (by @moduvoice)
+- Improve TTS with per-agent auto-voice quality and stable timbre registration [#670](https://github.com/THU-MAIC/OpenMAIC/pull/670), and unify the provider-enablement model with browser-native TTS off by default [#665](https://github.com/THU-MAIC/OpenMAIC/pull/665)
+- Add opt-in parallel scene-content generation [#660](https://github.com/THU-MAIC/OpenMAIC/pull/660) (by @ly-wang19)
+- Add a document extractor provider foundation [#704](https://github.com/THU-MAIC/OpenMAIC/pull/704) (by @jackefn)
+- Infer concise course titles from outlines for more readable course names [#756](https://github.com/THU-MAIC/OpenMAIC/pull/756)
+- Refactor widget actions into the unified scene action pipeline [#796](https://github.com/THU-MAIC/OpenMAIC/pull/796)
+
+### Bug Fixes
+
+- Importer: port PPTX shape-restoration hotfixes [#789](https://github.com/THU-MAIC/OpenMAIC/pull/789) (by @xuyuanwei678), fix hanging-indent bullet rendering [#727](https://github.com/THU-MAIC/OpenMAIC/pull/727) (by @xuyuanwei678), and guard SVG export against arc-first paths [#638](https://github.com/THU-MAIC/OpenMAIC/pull/638) (by @ly-wang19)
+- Generation: make outline type changes take effect so interactive/PBL outlines are no longer downgraded to slides [#772](https://github.com/THU-MAIC/OpenMAIC/pull/772), stop regenerating deleted slides on finished decks [#769](https://github.com/THU-MAIC/OpenMAIC/pull/769), show full key-point text in the outline editor [#782](https://github.com/THU-MAIC/OpenMAIC/pull/782), and linearize outline streaming and interactive post-processing for better performance [#732](https://github.com/THU-MAIC/OpenMAIC/pull/732)
+- Agent: respond to the user's turn before lecturing [#699](https://github.com/THU-MAIC/OpenMAIC/pull/699), and constrain action narration to a single teacher voice [#671](https://github.com/THU-MAIC/OpenMAIC/pull/671)
+- Editor: stop dumping the raw tool-failure blob in AI edit tool cards [#785](https://github.com/THU-MAIC/OpenMAIC/pull/785), persist AgentBar voice and mode selections across reloads [#723](https://github.com/THU-MAIC/OpenMAIC/pull/723), and keep the edit runtime alive across read-only scenes [#802](https://github.com/THU-MAIC/OpenMAIC/pull/802) (by @cosarah)
+- Audio: gate the speech button on ASR availability [#711](https://github.com/THU-MAIC/OpenMAIC/pull/711), revoke blob URLs when playback is rejected [#652](https://github.com/THU-MAIC/OpenMAIC/pull/652) (by @ly-wang19), and surface TTS provider rate limits as HTTP 429 [#644](https://github.com/THU-MAIC/OpenMAIC/pull/644) (by @ly-wang19)
+- Renderer: make the code entrance animation play line by line [#724](https://github.com/THU-MAIC/OpenMAIC/pull/724) (by @tongshu2023)
+- Security: point the SSRF local-network rejection at the `ALLOW_LOCAL_NETWORKS` escape hatch [#667](https://github.com/THU-MAIC/OpenMAIC/pull/667) (by @mvanhorn)
+- Networking: bypass the proxy for loopback hosts and honor `NO_PROXY` [#718](https://github.com/THU-MAIC/OpenMAIC/pull/718) (by @tongshu2023)
+- Fix overlay layout shift on the home and classroom pages [#690](https://github.com/THU-MAIC/OpenMAIC/pull/690) (by @cosarah)
+
+### Other Changes
+
+- Drop the dead `ThumbnailSlide` path and fix `@maic/dsl` Node ESM resolution [#736](https://github.com/THU-MAIC/OpenMAIC/pull/736)
+- Docs: correct the stale i18n location and supported-language list [#640](https://github.com/THU-MAIC/OpenMAIC/pull/640) (by @ly-wang19)
+
+## [0.2.2] - 2026-06-02
+
+### Features
+
+- **MAIC Editor (v0) — slide editing surface** — A new **Pro Mode** toggle turns any generated slide into an editable canvas: select and edit text, insert text boxes and images, navigate and reorder slides from a thumbnail rail, with history-aware undo/redo. This is the first surface of the broader MAIC Editor framework (gated behind `NEXT_PUBLIC_MAIC_EDITOR_ENABLED`) [#615](https://github.com/THU-MAIC/OpenMAIC/pull/615)
+- **Editable outline before generation** — The streaming course outline now morphs into an inline editor: review, edit, reorder, and add or delete scenes and bullet points, then confirm to generate the full course — so you catch structure problems before spending a full generation [#558](https://github.com/THU-MAIC/OpenMAIC/pull/558)
+- **Offline-ready classroom export** — Exported teaching resource packs and classroom ZIPs now inline external assets so interactive pages open fully offline, even when copied to another machine [#613](https://github.com/THU-MAIC/OpenMAIC/pull/613)
+- Add Claude Opus 4.8 and MiniMax M3 to the default model registry [#635](https://github.com/THU-MAIC/OpenMAIC/pull/635)
+- Add Gemini 3.5 Flash [#584](https://github.com/THU-MAIC/OpenMAIC/pull/584)
+- Add Xiaomi MiMo Token Plan support [#578](https://github.com/THU-MAIC/OpenMAIC/pull/578) (by @xuruiray)
+- Add web search providers: Brave and Baidu [#42](https://github.com/THU-MAIC/OpenMAIC/pull/42) (by @YizukiAme), Bocha [#524](https://github.com/THU-MAIC/OpenMAIC/pull/524), and MiniMax [#634](https://github.com/THU-MAIC/OpenMAIC/pull/634)
+- Add Azure STT (Fast Transcription) as a speech-to-text provider [#175](https://github.com/THU-MAIC/OpenMAIC/pull/175) (by @ismailariyan)
+- Add HappyHorse video adapter [#509](https://github.com/THU-MAIC/OpenMAIC/pull/509) (by @xuruiray) and Lemonade as an LLM provider [#508](https://github.com/THU-MAIC/OpenMAIC/pull/508)
+- Add OpenAI image generation environment-variable fallback [#510](https://github.com/THU-MAIC/OpenMAIC/pull/510) (by @xuruiray)
+- Add generated-video manifest references so produced videos survive export/import [#540](https://github.com/THU-MAIC/OpenMAIC/pull/540)
+- Add Traditional Chinese (zh-TW) [#517](https://github.com/THU-MAIC/OpenMAIC/pull/517) (by @alvinets) and Brazilian Portuguese (pt-BR) [#602](https://github.com/THU-MAIC/OpenMAIC/pull/602) (by @hemanz) interface languages
+
+### Bug Fixes
+
+- **Server-configured providers are now admin-managed** — providers set via server environment can no longer be overridden by client settings, preventing base-URL/key tampering on shared deployments [#624](https://github.com/THU-MAIC/OpenMAIC/pull/624); fixes server API-key fallback when the client echoes the provider base URL [#533](https://github.com/THU-MAIC/OpenMAIC/pull/533) (by @LooThao); auto-selects the server LLM model [#577](https://github.com/THU-MAIC/OpenMAIC/pull/577) (by @xuruiray); and enforces a "usable provider ⇒ concrete model" invariant [#581](https://github.com/THU-MAIC/OpenMAIC/pull/581)
+- Keep interactive scenes alive across remounts with an iframe keep-alive pool, so interactive content no longer reloads when navigating [#629](https://github.com/THU-MAIC/OpenMAIC/pull/629)
+- Restore the orchestration director's ability to answer the user's question and stop runaway turns (removed `maxTurns`) [#599](https://github.com/THU-MAIC/OpenMAIC/pull/599); restore agent attribution in the director summary [#554](https://github.com/THU-MAIC/OpenMAIC/pull/554) (by @ashutoshrana)
+- Skip shapes with malformed SVG paths instead of aborting the whole PPTX export [#505](https://github.com/THU-MAIC/OpenMAIC/pull/505); prevent memory leaks and silent export failures [#552](https://github.com/THU-MAIC/OpenMAIC/pull/552) (by @arnow117)
+- Add defensive checks in ChartElement to prevent crashes on malformed chart data [#588](https://github.com/THU-MAIC/OpenMAIC/pull/588) (by @tongshu2023)
+- Let whiteboard code elements capture internal scroll/drag instead of the canvas [#544](https://github.com/THU-MAIC/OpenMAIC/pull/544) (by @cosarah)
+- Preserve discussion triggers when importing classroom ZIPs [#557](https://github.com/THU-MAIC/OpenMAIC/pull/557) (by @cosarah)
+- Fix generated video thumbnails [#546](https://github.com/THU-MAIC/OpenMAIC/pull/546)
+- Gate media snippets in the interactive-outlines prompt template [#628](https://github.com/THU-MAIC/OpenMAIC/pull/628)
+- Hide the unsupported MiniMax Hailuo fast text-to-video model [#632](https://github.com/THU-MAIC/OpenMAIC/pull/632); remove weak Lemonade recommended models [#567](https://github.com/THU-MAIC/OpenMAIC/pull/567) (by @cosarah)
+- Fix Haiku 4.5 thinking controls [#501](https://github.com/THU-MAIC/OpenMAIC/pull/501)
+- Use an ESM import for TypeScript in the pptxgenjs rollup config [#616](https://github.com/THU-MAIC/OpenMAIC/pull/616)
+- Align zh-TW provider names with the rest of the locale set
+
+### Other Changes
+
+- Add a Fumadocs-based documentation site [#622](https://github.com/THU-MAIC/OpenMAIC/pull/622)
+- Add a VoxCPM2 setup guide and tighten the README section [#500](https://github.com/THU-MAIC/OpenMAIC/pull/500) [#502](https://github.com/THU-MAIC/OpenMAIC/pull/502)
+- Fix the commercial licensing contact email [#604](https://github.com/THU-MAIC/OpenMAIC/pull/604) (by @DHQ1204)
+
 ## [0.2.1] - 2026-04-26
 
 ### Features

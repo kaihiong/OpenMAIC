@@ -152,6 +152,17 @@ const deepseekEffort: ThinkingCapability = {
   defaultEnabled: true,
 };
 
+const glm52Effort: ThinkingCapability = {
+  control: 'effort',
+  requestAdapter: 'glm',
+  effortValues: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+  defaultEffort: 'max',
+  defaultMode: 'enabled',
+  toggleable: true,
+  budgetAdjustable: true,
+  defaultEnabled: true,
+};
+
 const hunyuanHy3Effort: ThinkingCapability = {
   control: 'effort',
   requestAdapter: 'hunyuan',
@@ -214,6 +225,8 @@ const doubaoSeed20Effort: ThinkingCapability = {
   defaultEnabled: true,
 };
 
+const minimaxM3Thinking = toggleCapability('anthropic', false);
+
 const THINKING_CAPABILITIES: Record<string, ThinkingCapability> = {
   [getModelMetadataKey('openai', 'gpt-5.5')]: effortCapability(
     'openai',
@@ -241,12 +254,17 @@ const THINKING_CAPABILITIES: Record<string, ThinkingCapability> = {
     'none',
   ),
 
+  [getModelMetadataKey('anthropic', 'claude-opus-4-8')]: anthropicOpus47Effort,
   [getModelMetadataKey('anthropic', 'claude-opus-4-7')]: anthropicOpus47Effort,
   [getModelMetadataKey('anthropic', 'claude-opus-4-6')]: anthropicAdaptiveEffort,
   [getModelMetadataKey('anthropic', 'claude-sonnet-4-6')]: anthropicAdaptiveEffort,
   [getModelMetadataKey('anthropic', 'claude-sonnet-4-5')]: anthropicManualEffort,
   [getModelMetadataKey('anthropic', 'claude-haiku-4-5')]: anthropicBudget,
 
+  [getModelMetadataKey('google', 'gemini-3.5-flash')]: levelCapability(
+    ['minimal', 'low', 'medium', 'high'],
+    'medium',
+  ),
   [getModelMetadataKey('google', 'gemini-3.1-pro-preview')]: levelCapability(
     ['minimal', 'low', 'medium', 'high'],
     'high',
@@ -273,6 +291,7 @@ const THINKING_CAPABILITIES: Record<string, ThinkingCapability> = {
     -1,
   ),
 
+  [getModelMetadataKey('glm', 'glm-5.2')]: glm52Effort,
   [getModelMetadataKey('glm', 'glm-5.1')]: toggleCapability('glm'),
   [getModelMetadataKey('glm', 'glm-5v-turbo')]: toggleCapability('glm'),
   [getModelMetadataKey('glm', 'glm-5')]: toggleCapability('glm'),
@@ -283,6 +302,8 @@ const THINKING_CAPABILITIES: Record<string, ThinkingCapability> = {
   [getModelMetadataKey('glm', 'glm-4.6v')]: toggleCapability('glm'),
   [getModelMetadataKey('glm', 'glm-4.6v-flash')]: toggleCapability('glm'),
 
+  [getModelMetadataKey('qwen', 'qwen3.7-plus')]: qwenBudgetEnabled,
+  [getModelMetadataKey('qwen', 'qwen3.7-max')]: qwenBudgetEnabled,
   [getModelMetadataKey('qwen', 'qwen3.6-max-preview')]: qwenBudgetDisabled,
   [getModelMetadataKey('qwen', 'qwen3.6-plus')]: qwenBudgetEnabled,
   [getModelMetadataKey('qwen', 'qwen3.6-plus-2026-04-02')]: qwenBudgetEnabled,
@@ -297,6 +318,8 @@ const THINKING_CAPABILITIES: Record<string, ThinkingCapability> = {
   [getModelMetadataKey('deepseek', 'deepseek-v4-pro')]: deepseekEffort,
   [getModelMetadataKey('deepseek', 'deepseek-v4-flash')]: deepseekEffort,
 
+  [getModelMetadataKey('kimi', 'kimi-k2.7-code')]: fixedThinkingCapability,
+  [getModelMetadataKey('kimi', 'kimi-k2.7-code-highspeed')]: fixedThinkingCapability,
   [getModelMetadataKey('kimi', 'kimi-k2.6')]: toggleCapability('kimi'),
   [getModelMetadataKey('kimi', 'kimi-k2.5')]: toggleCapability('kimi'),
   [getModelMetadataKey('kimi', 'kimi-k2-thinking')]: toggleCapability('kimi'),
@@ -328,6 +351,7 @@ const THINKING_CAPABILITIES: Record<string, ThinkingCapability> = {
   [getModelMetadataKey('grok', 'grok-4.20-multi-agent')]: fixedThinkingCapability,
   [getModelMetadataKey('grok', 'grok-4-1-fast-reasoning')]: fixedThinkingCapability,
 
+  [getModelMetadataKey('minimax', 'MiniMax-M3')]: minimaxM3Thinking,
   [getModelMetadataKey('minimax', 'MiniMax-M2.7')]: fixedThinkingCapability,
 
   [getModelMetadataKey('tencent-hunyuan', 'hy3-preview')]: hunyuanHy3Effort,
