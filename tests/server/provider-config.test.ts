@@ -8,6 +8,7 @@ let yamlOverride: string | null = null;
 const ENV_PREFIXES_TO_CLEAR = [
   'OPENAI',
   'ANTHROPIC',
+  'AZURE_OPENAI',
   'GOOGLE',
   'DEEPSEEK',
   'QWEN',
@@ -37,6 +38,7 @@ const ENV_PREFIXES_TO_CLEAR = [
   'PDF_MINERU',
   'PDF_MINERU_CLOUD',
   'IMAGE_OPENAI',
+  'IMAGE_AZURE_OPENAI',
   'IMAGE_SEEDREAM',
   'IMAGE_QWEN_IMAGE',
   'IMAGE_NANO_BANANA',

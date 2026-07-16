@@ -283,7 +283,10 @@ function applyAzureOpenAIImageFallback(
   const yamlEntry = yamlImageSection?.[AZURE_OPENAI_IMAGE_PROVIDER_ID];
   const modelsStr = process.env.IMAGE_AZURE_OPENAI_MODELS || process.env.AZURE_OPENAI_IMAGE_MODELS;
   const models = modelsStr
-    ? modelsStr.split(',').map((m) => m.trim()).filter(Boolean)
+    ? modelsStr
+        .split(',')
+        .map((m) => m.trim())
+        .filter(Boolean)
     : yamlEntry?.models;
 
   imageConfig[AZURE_OPENAI_IMAGE_PROVIDER_ID] = {

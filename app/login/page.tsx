@@ -10,7 +10,14 @@ const DESCRIPTION =
 const FEATURES = [
   {
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
       </svg>
     ),
@@ -19,9 +26,18 @@ const FEATURES = [
   },
   {
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     ),
     title: 'Multi-Agent Classroom',
@@ -29,8 +45,17 @@ const FEATURES = [
   },
   {
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="2" y="3" width="20" height="14" rx="2" />
+        <line x1="8" y1="21" x2="16" y2="21" />
+        <line x1="12" y1="17" x2="12" y2="21" />
       </svg>
     ),
     title: 'Rich Scene Types',
@@ -38,8 +63,16 @@ const FEATURES = [
   },
   {
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" />
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+        <path d="M6 12v5c3 3 9 3 12 0v-5" />
       </svg>
     ),
     title: 'Institutional Access',
@@ -82,7 +115,11 @@ export default function LoginPage() {
       };
       tick();
     }, 1400);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -143,7 +180,14 @@ export default function LoginPage() {
         {/* Right panel */}
         <div style={styles.right}>
           <div style={{ ...styles.logoWrap, ...(loaded ? styles.fadeIn : {}) }}>
-            <Image src="/nie-logo.svg" alt="NIE Logo" width={280} height={80} style={{ height: 'auto' }} priority />
+            <Image
+              src="/nie-logo.svg"
+              alt="NIE Logo"
+              width={280}
+              height={80}
+              style={{ height: 'auto' }}
+              priority
+            />
           </div>
           <h1 style={{ ...styles.formTitle, ...(loaded ? styles.fadeIn : {}) }}>
             <span style={styles.formTitleMain}>OpenMAIC</span>
@@ -157,13 +201,22 @@ export default function LoginPage() {
             <div style={styles.formGroup}>
               <label style={styles.label}>Username</label>
               <div style={styles.inputWrap}>
-                <svg style={styles.inputIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                <svg
+                  style={styles.inputIcon}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
                 </svg>
                 <input
                   type="text"
                   value={username}
-                  onChange={e => setUsername(e.target.value)}
+                  onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter your username"
                   required
                   style={styles.input}
@@ -175,13 +228,22 @@ export default function LoginPage() {
             <div style={styles.formGroup}>
               <label style={styles.label}>Password</label>
               <div style={styles.inputWrap}>
-                <svg style={styles.inputIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                <svg
+                  style={styles.inputIcon}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
                 <input
                   type="password"
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
                   required
                   style={styles.input}
@@ -190,8 +252,18 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <button type="submit" disabled={loading} style={{ ...styles.btn, ...(loading ? styles.btnLoading : {}) }}>
-              {loading ? <span style={styles.spinner} /> : <>Login <ArrowIcon /></>}
+            <button
+              type="submit"
+              disabled={loading}
+              style={{ ...styles.btn, ...(loading ? styles.btnLoading : {}) }}
+            >
+              {loading ? (
+                <span style={styles.spinner} />
+              ) : (
+                <>
+                  Login <ArrowIcon />
+                </>
+              )}
             </button>
           </form>
         </div>
@@ -218,8 +290,18 @@ export default function LoginPage() {
 
 function ArrowIcon() {
   return (
-    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+    <svg
+      width={18}
+      height={18}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
     </svg>
   );
 }
@@ -329,7 +411,13 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'opacity 0.5s ease 0.2s',
   },
   formTitleMain: { color: '#3182ce' },
-  formTitleSub: { display: 'block', fontSize: '1.4rem', fontWeight: 600, color: '#4a5568', marginTop: 4 },
+  formTitleSub: {
+    display: 'block',
+    fontSize: '1.4rem',
+    fontWeight: 600,
+    color: '#4a5568',
+    marginTop: 4,
+  },
   form: { width: '100%' },
   errorBox: {
     color: '#e53e3e',
@@ -343,7 +431,13 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
   },
   formGroup: { marginBottom: '1.4rem' },
-  label: { display: 'block', marginBottom: 4, fontWeight: 500, color: '#4a5568', fontSize: '0.85rem' },
+  label: {
+    display: 'block',
+    marginBottom: 4,
+    fontWeight: 500,
+    color: '#4a5568',
+    fontSize: '0.85rem',
+  },
   inputWrap: { position: 'relative' },
   inputIcon: {
     position: 'absolute',

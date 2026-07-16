@@ -1587,7 +1587,9 @@ export function getModel(config: ModelConfig): ModelWithInfo {
         const rawHeaders = init?.headers;
         const normalizedHeaders: Record<string, string> = {};
         if (rawHeaders instanceof Headers) {
-          rawHeaders.forEach((v, k) => { normalizedHeaders[k] = v; });
+          rawHeaders.forEach((v, k) => {
+            normalizedHeaders[k] = v;
+          });
         } else if (Array.isArray(rawHeaders)) {
           for (const [k, v] of rawHeaders) normalizedHeaders[k] = v;
         } else if (rawHeaders) {

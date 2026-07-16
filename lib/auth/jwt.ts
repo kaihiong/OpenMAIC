@@ -45,12 +45,14 @@ export async function signJWT(user: SessionUser): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = b64url(new TextEncoder().encode(JSON.stringify({ alg: 'HS256', typ: 'JWT' })));
   const payload = b64url(
-    new TextEncoder().encode(
-      JSON.stringify({ ...user, iat: now, exp: now + EXPIRY_SECONDS }),
-    ),
+    new TextEncoder().encode(JSON.stringify({ ...user, iat: now, exp: now + EXPIRY_SECONDS })),
   );
   const input = `${header}.${payload}`;
-  const sig = await crypto.subtle.sign('HMAC', await hmacKey(secret), new TextEncoder().encode(input));
+  const sig = await crypto.subtle.sign(
+    'HMAC',
+    await hmacKey(secret),
+    new TextEncoder().encode(input),
+  );
   return `${input}.${b64url(sig)}`;
 }
 

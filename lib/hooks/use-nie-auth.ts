@@ -22,8 +22,10 @@ export function useNieAuth() {
         setNieAuthEnabled(enabled);
         if (enabled) {
           return fetch('/api/auth/me')
-            .then((r) => r.ok ? r.json() : null)
-            .then((d) => setUser(d ? { name: d.name, email: d.email, department: d.department } : null))
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) =>
+              setUser(d ? { name: d.name, email: d.email, department: d.department } : null),
+            )
             .catch(() => {});
         }
       })
