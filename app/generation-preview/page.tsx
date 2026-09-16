@@ -12,37 +12,91 @@ import { cn } from '@/lib/utils';
 import { useStageStore } from '@/lib/store/stage';
 import { useSettingsStore } from '@/lib/store/settings';
 import { useAgentRegistry } from '@/lib/orchestration/registry/store';
-import { getEnabledProvidersWithVoices } from '@/lib/audio/voice-resolver';
+import {
+  getEnabledProvidersWithVoices,
+  resolveNarratorVoiceForGeneration,
+} from '@/lib/audio/voice-resolver';
+import { isQwenCloneVoice, resolveTTSModelForVoice } from '@/lib/audio/constants';
 import { isTTSProviderEnabled } from '@/lib/audio/provider-enablement';
-import { useVoxCPMVoiceProfiles } from '@/lib/audio/voxcpm-voices';
+import { useAllVoiceProfiles } from '@/lib/audio/voxcpm-voices';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import {
   fetchSceneActions,
   fetchSceneContent,
-  generateAndStoreTTS,
+  generateTTSForScene,
 } from '@/lib/hooks/use-scene-generator';
-import { isAbortError } from '@/lib/generation/generation-retry';
+import { isAbortError } from '@openmaic/generation';
 import { FOREGROUND_SCENE_RETRY_OPTIONS } from './foreground-retry';
 import {
   loadImageMapping,
-  loadPdfBlob,
+  loadDocumentBlob,
   cleanupOldImages,
   storeImages,
 } from '@/lib/utils/image-storage';
 import { getCurrentModelConfig } from '@/lib/utils/model-config';
-import { MAX_PDF_CONTENT_CHARS, MAX_VISION_IMAGES } from '@/lib/constants/generation';
+import { resolveSessionDocumentSources } from '@/lib/document/session-sources';
+import { MAX_VISION_IMAGES } from '@/lib/constants/generation';
+import {
+  MAX_DOCUMENT_BUNDLE_FILES,
+  MAX_DOCUMENT_BUNDLE_TOTAL_SIZE_BYTES,
+  buildDocumentBundle,
+  type ParsedDocumentPart,
+} from '@/lib/document/bundle';
 import { buildVideoManifestFromOutlines } from '@/lib/media/video-manifest';
 import { nanoid } from 'nanoid';
-import type { Stage } from '@/lib/types/stage';
-import type { SceneOutline, PdfImage, ImageMapping } from '@/lib/types/generation';
+import type { GeneratedAgentConfig, Stage } from '@/lib/types/stage';
+import type {
+  SceneOutline,
+  PdfImage,
+  ImageMapping,
+  SessionDocumentSource,
+} from '@/lib/types/generation';
 import { AgentRevealModal } from '@/components/agent/agent-reveal-modal';
 import { createLogger } from '@/lib/logger';
-import { type GenerationSessionState, ALL_STEPS, getActiveSteps } from './types';
+import {
+  type GenerationSessionState,
+  ALL_STEPS,
+  getActiveSteps,
+  getGenerationStepText,
+} from './types';
 import { StepVisualizer } from './components/visualizers';
 import { resolveTaskEngineModeFromOutlineDoneEvent } from './vocational-mode';
 
 const log = createLogger('GenerationPreview');
 const OUTLINE_REVIEW_AUTO_CONTINUE_MS = 2500;
+
+type ParsedDocumentResponseImage = {
+  id: string;
+  src?: string;
+  pageNumber?: number;
+  description?: string;
+  width?: number;
+  height?: number;
+};
+
+function validateDocumentSources(
+  sources: SessionDocumentSource[],
+  t: (key: string, values?: Record<string, unknown>) => string,
+) {
+  if (sources.length > MAX_DOCUMENT_BUNDLE_FILES) {
+    throw new Error(t('upload.courseMaterialCountLimit', { n: MAX_DOCUMENT_BUNDLE_FILES }));
+  }
+
+  const totalSize = sources.reduce((sum, source) => sum + source.size, 0);
+  if (totalSize > MAX_DOCUMENT_BUNDLE_TOTAL_SIZE_BYTES) {
+    throw new Error(
+      t('upload.courseMaterialTotalSizeLimit', {
+        n: Math.floor(MAX_DOCUMENT_BUNDLE_TOTAL_SIZE_BYTES / 1024 / 1024),
+      }),
+    );
+  }
+}
+
+type SceneGenerationFailure = {
+  error?: string;
+  errorCode?: string;
+  statusCode?: number;
+};
 
 function GenerationPreviewContent() {
   const router = useRouter();
@@ -55,7 +109,7 @@ function GenerationPreviewContent() {
   // streaming card mid-stream, or by restoring a session that was already in review).
   // Combined with `reviewOutlineEnabled` to decide whether the post-stream timer fires.
   const outlineReviewIntentRef = useRef(false);
-  const { profiles: voxcpmProfiles } = useVoxCPMVoiceProfiles();
+  const { profiles: voiceProfiles } = useAllVoiceProfiles();
 
   const [session, setSession] = useState<GenerationSessionState | null>(null);
   const [sessionLoaded, setSessionLoaded] = useState(false);
@@ -90,6 +144,34 @@ function GenerationPreviewContent() {
   const activeSteps = getActiveSteps(session);
   const isOutlineReady = session?.previewPhase === 'outline-ready';
   const isReviewingOutlines = session?.previewPhase === 'review';
+
+  const sceneGenerationErrorMessage = (failure: SceneGenerationFailure): string => {
+    if (
+      failure.errorCode === 'MISSING_API_KEY' ||
+      failure.statusCode === 401 ||
+      failure.statusCode === 403
+    ) {
+      return t('generation.sceneGenerateAuthFailed');
+    }
+
+    if (failure.errorCode === 'RATE_LIMITED' || failure.statusCode === 429) {
+      return t('generation.sceneGenerateRateLimited');
+    }
+
+    if (failure.errorCode === 'UPSTREAM_ERROR' && failure.statusCode && failure.statusCode >= 500) {
+      return t('generation.sceneGenerateProviderUnavailable');
+    }
+
+    if (failure.errorCode === 'INTERNAL_ERROR') {
+      return t('generation.sceneGenerateFailed');
+    }
+
+    if (failure.errorCode === 'GENERATION_FAILED') {
+      return t('generation.sceneGenerateInvalidResponse');
+    }
+
+    return failure.error || t('generation.sceneGenerateFailed');
+  };
 
   const persistSession = (nextSession: GenerationSessionState) => {
     setSession(nextSession);
@@ -231,7 +313,7 @@ function GenerationPreviewContent() {
     abortControllerRef.current = controller;
     const signal = controller.signal;
 
-    // Use a local mutable copy so we can update it after PDF parsing
+    // Use a local mutable copy so we can update it after document extraction
     let currentSession = generationSession;
 
     setError(null);
@@ -241,127 +323,122 @@ function GenerationPreviewContent() {
       // Compute active steps for this session (recomputed after session mutations)
       let activeSteps = getActiveSteps(currentSession);
 
-      // Determine if we need the PDF analysis step
-      const hasPdfToAnalyze = !!currentSession.pdfStorageKey && !currentSession.pdfText;
-      // If no PDF to analyze, skip to the next available step
+      // Determine if we need the document analysis step
+      const documentSources = resolveSessionDocumentSources(currentSession);
+      const hasPdfToAnalyze = documentSources.length > 0 && !currentSession.pdfText;
+      // If no document to analyze, skip to the next available step
       if (!hasPdfToAnalyze) {
         const firstNonPdfIdx = activeSteps.findIndex((s) => s.id !== 'pdf-analysis');
         setCurrentStepIndex(Math.max(0, firstNonPdfIdx));
       }
 
-      // Step 0: Parse PDF if needed
+      // Step 0: Extract uploaded course material if needed
       if (hasPdfToAnalyze) {
-        log.debug('=== Generation Preview: Parsing PDF ===');
-        const pdfBlob = await loadPdfBlob(currentSession.pdfStorageKey!);
-        if (!pdfBlob) {
-          throw new Error(t('generation.pdfLoadFailed'));
-        }
+        log.debug('=== Generation Preview: Extracting course material bundle ===');
+        validateDocumentSources(documentSources, t);
+        const sortedDocumentSources = [...documentSources].sort((a, b) => a.order - b.order);
+        const parsedParts = await Promise.all(
+          sortedDocumentSources.map(async (source): Promise<ParsedDocumentPart> => {
+            const providerId = source.providerId || currentSession.pdfProviderId;
+            const legacySourceConfig = (
+              source as SessionDocumentSource & {
+                providerConfig?: {
+                  apiKey?: string;
+                  baseUrl?: string;
+                  accessKeyId?: string;
+                  accessKeySecret?: string;
+                };
+              }
+            ).providerConfig;
+            const providerConfig = currentSession.pdfProviderConfig || legacySourceConfig;
+            const documentBlob = await loadDocumentBlob(source.storageKey);
+            if (!(documentBlob instanceof Blob) || documentBlob.size === 0) {
+              throw new Error(t('generation.courseMaterialLoadFailed'));
+            }
+            const documentFile = new File([documentBlob], source.name || 'document.pdf', {
+              type: source.mimeType || documentBlob.type || 'application/pdf',
+            });
+            const parseFormData = new FormData();
+            parseFormData.append('file', documentFile);
+            if (providerId) parseFormData.append('providerId', providerId);
+            if (providerConfig?.apiKey?.trim())
+              parseFormData.append('apiKey', providerConfig.apiKey);
+            if (providerConfig?.baseUrl?.trim())
+              parseFormData.append('baseUrl', providerConfig.baseUrl);
+            if (providerConfig?.accessKeyId?.trim()) {
+              parseFormData.append('accessKeyId', providerConfig.accessKeyId);
+            }
+            if (providerConfig?.accessKeySecret?.trim()) {
+              parseFormData.append('accessKeySecret', providerConfig.accessKeySecret);
+            }
+            const parseResponse = await fetch('/api/extract-document', {
+              method: 'POST',
+              body: parseFormData,
+              signal,
+            });
+            if (!parseResponse.ok) throw new Error(t('generation.courseMaterialParseFailed'));
+            const parseResult = await parseResponse.json();
+            if (!parseResult.success || !parseResult.data) {
+              throw new Error(t('generation.courseMaterialParseFailed'));
+            }
+            const parseData = parseResult.data;
+            const rawImages = parseData.metadata?.pdfImages;
+            const images = rawImages
+              ? rawImages.map((img: ParsedDocumentResponseImage) => ({
+                  id: img.id,
+                  src: img.src || '',
+                  pageNumber: img.pageNumber ?? 1,
+                  description: img.description,
+                  width: img.width,
+                  height: img.height,
+                }))
+              : ((parseData.images as string[] | undefined) ?? []).map((src, i) => ({
+                  id: `img_${i + 1}`,
+                  src,
+                  pageNumber: 1,
+                }));
 
-        // Ensure pdfBlob is a valid Blob with content
-        if (!(pdfBlob instanceof Blob) || pdfBlob.size === 0) {
-          log.error('Invalid PDF blob:', {
-            type: typeof pdfBlob,
-            size: pdfBlob instanceof Blob ? pdfBlob.size : 'N/A',
-          });
-          throw new Error(t('generation.pdfLoadFailed'));
-        }
-
-        // Wrap as a File to guarantee multipart/form-data with correct content-type
-        const pdfFile = new File([pdfBlob], currentSession.pdfFileName || 'document.pdf', {
-          type: 'application/pdf',
-        });
-
-        const parseFormData = new FormData();
-        parseFormData.append('pdf', pdfFile);
-
-        if (currentSession.pdfProviderId) {
-          parseFormData.append('providerId', currentSession.pdfProviderId);
-        }
-        if (currentSession.pdfProviderConfig?.apiKey?.trim()) {
-          parseFormData.append('apiKey', currentSession.pdfProviderConfig.apiKey);
-        }
-        if (currentSession.pdfProviderConfig?.baseUrl?.trim()) {
-          parseFormData.append('baseUrl', currentSession.pdfProviderConfig.baseUrl);
-        }
-
-        const parseResponse = await fetch('/api/parse-pdf', {
-          method: 'POST',
-          body: parseFormData,
-          signal,
-        });
-
-        if (!parseResponse.ok) {
-          const errorData = await parseResponse.json();
-          throw new Error(errorData.error || t('generation.pdfParseFailed'));
-        }
-
-        const parseResult = await parseResponse.json();
-        if (!parseResult.success || !parseResult.data) {
-          throw new Error(t('generation.pdfParseFailed'));
-        }
-
-        let pdfText = parseResult.data.text as string;
-
-        // Truncate if needed
-        if (pdfText.length > MAX_PDF_CONTENT_CHARS) {
-          pdfText = pdfText.substring(0, MAX_PDF_CONTENT_CHARS);
-        }
-
-        // Create image metadata and store images
-        // Prefer metadata.pdfImages (both parsers now return this)
-        const rawPdfImages = parseResult.data.metadata?.pdfImages;
-        const images = rawPdfImages
-          ? rawPdfImages.map(
-              (img: {
-                id: string;
-                src?: string;
-                pageNumber?: number;
-                description?: string;
-                width?: number;
-                height?: number;
-              }) => ({
-                id: img.id,
-                src: img.src || '',
-                pageNumber: img.pageNumber || 1,
-                description: img.description,
-                width: img.width,
-                height: img.height,
-              }),
-            )
-          : (parseResult.data.images as string[]).map((src: string, i: number) => ({
-              id: `img_${i + 1}`,
-              src,
-              pageNumber: 1,
-            }));
-
-        const imageStorageIds = await storeImages(images);
-
-        const pdfImages: PdfImage[] = images.map(
-          (
-            img: {
-              id: string;
-              src: string;
-              pageNumber: number;
-              description?: string;
-              width?: number;
-              height?: number;
-            },
-            i: number,
-          ) => ({
-            id: img.id,
-            src: '',
-            pageNumber: img.pageNumber,
-            description: img.description,
-            width: img.width,
-            height: img.height,
-            storageId: imageStorageIds[i],
+            return {
+              source: {
+                id: source.id,
+                name: source.name,
+                size: source.size,
+                lastModified: source.lastModified,
+                mimeType: source.mimeType,
+                order: source.order,
+                providerId,
+              },
+              text: parseData.text as string,
+              rawTextLength: (parseData.text as string).length,
+              pageCount: parseData.metadata?.pageCount,
+              images,
+            };
           }),
         );
 
-        // Update session with parsed PDF data
+        const bundle = buildDocumentBundle(parsedParts);
+        const imageStorageIds = await storeImages(bundle.images);
+
+        const pdfImages: PdfImage[] = bundle.images.map((img, i) => ({
+          id: img.id,
+          src: '',
+          pageNumber: img.pageNumber,
+          description: img.description,
+          width: img.width,
+          height: img.height,
+          originalId: img.originalId,
+          sourceDocumentId: img.sourceDocumentId,
+          sourceDocumentName: img.sourceDocumentName,
+          sourceDocumentOrder: img.sourceDocumentOrder,
+          visionPriority: img.visionPriority,
+          storageId: imageStorageIds[i],
+        }));
+
+        // Update session with extracted document data
         const updatedSession = {
           ...currentSession,
-          pdfText,
+          documentSources,
+          pdfText: bundle.text,
           pdfImages,
           imageStorageIds,
           pdfStorageKey: undefined, // Clear so we don't re-parse
@@ -371,12 +448,15 @@ function GenerationPreviewContent() {
 
         // Truncation warnings
         const warnings: string[] = [];
-        if ((parseResult.data.text as string).length > MAX_PDF_CONTENT_CHARS) {
-          warnings.push(t('generation.textTruncated', { n: MAX_PDF_CONTENT_CHARS }));
+        if (bundle.totalRawTextLength > bundle.textContentBudget) {
+          warnings.push(t('generation.textTruncated', { n: bundle.textContentBudget }));
         }
-        if (images.length > MAX_VISION_IMAGES) {
+        if (bundle.totalImageCount > MAX_VISION_IMAGES) {
           warnings.push(
-            t('generation.imageTruncated', { total: images.length, max: MAX_VISION_IMAGES }),
+            t('generation.imageTruncated', {
+              total: bundle.totalImageCount,
+              max: MAX_VISION_IMAGES,
+            }),
           );
         }
         if (warnings.length > 0) {
@@ -406,8 +486,9 @@ function GenerationPreviewContent() {
               pdfText: currentSession.pdfText || undefined,
               providerId: wsProviderId,
               apiKey: wsConfig?.apiKey || undefined,
-              baseUrl: wsConfig?.baseUrl || undefined,
+              baseUrl: wsProviderId === 'searxng' ? undefined : wsConfig?.baseUrl || undefined,
               baiduSubSources: wsProviderId === 'baidu' ? wsSettings.baiduSubSources : undefined,
+              claudeModelId: wsProviderId === 'claude' ? wsConfig?.modelId || undefined : undefined,
             }),
           ),
           signal,
@@ -436,7 +517,7 @@ function GenerationPreviewContent() {
         activeSteps = getActiveSteps(currentSession);
       }
 
-      // Load imageMapping early (needed for both outline and scene generation)
+      // Load imageMapping early (needed for both outline and scene generation).
       let imageMapping: ImageMapping = {};
       if (currentSession.imageStorageIds && currentSession.imageStorageIds.length > 0) {
         log.debug('Loading images from IndexedDB');
@@ -719,17 +800,43 @@ function GenerationPreviewContent() {
           const getAvailableVoicesForGeneration = () => {
             const providers = getEnabledProvidersWithVoices(
               settings.ttsProvidersConfig,
-              voxcpmProfiles,
+              voiceProfiles,
             );
             return providers.flatMap((p) =>
-              p.voices.map((v) => ({
-                providerId: p.providerId,
-                voiceId: v.id,
-                voiceName: v.name,
-                voiceLanguage: v.language,
-              })),
+              p.voices.map((v) => {
+                const cloneModelGroup =
+                  p.providerId === 'qwen-tts' && isQwenCloneVoice(v.id)
+                    ? p.modelGroups.find((group) =>
+                        group.voices.some((groupVoice) => groupVoice.id === v.id),
+                      )
+                    : undefined;
+                const modelId = cloneModelGroup
+                  ? resolveTTSModelForVoice(p.providerId, v.id, cloneModelGroup.modelId)
+                  : undefined;
+                return {
+                  providerId: p.providerId,
+                  ...(modelId ? { modelId } : {}),
+                  voiceId: v.id,
+                  voiceName: v.name,
+                  voiceLanguage: v.language,
+                };
+              }),
             );
           };
+
+          // The user's global TTS voice is the narrator voice. Pass it along so
+          // the server pins the teacher agent to it instead of letting the LLM
+          // pick a different voice. Reuse the same resolution helpers as the
+          // advertised list: the model follows the voice, and only clones carry
+          // a model on the wire. An unusable global voice (disabled/unconfigured
+          // provider) is NOT pinned — the LLM then picks a working advertised
+          // voice and the narration fallback machinery stays alive.
+          const getNarratorVoiceForGeneration = () =>
+            resolveNarratorVoiceForGeneration(
+              settings.ttsProviderId,
+              settings.ttsVoice,
+              settings.ttsProvidersConfig[settings.ttsProviderId],
+            );
 
           const agentResp = await fetch('/api/generate/agent-profiles', {
             method: 'POST',
@@ -745,6 +852,7 @@ function GenerationPreviewContent() {
                 availableAvatars: allAvatars.map((a) => a.path),
                 avatarDescriptions: allAvatars.map((a) => ({ path: a.path, desc: a.desc })),
                 availableVoices: getAvailableVoicesForGeneration(),
+                narratorVoice: getNarratorVoiceForGeneration(),
               }),
             ),
             signal,
@@ -754,11 +862,17 @@ function GenerationPreviewContent() {
           const agentData = await agentResp.json();
           if (!agentData.success) throw new Error(agentData.error || 'Agent generation failed');
 
-          // Save to IndexedDB and registry. The agent-profile LLM has already
-          // bound each agent's voice (from availableVoices); the fallback for an
-          // invalid/unavailable voice is applied later at the live TTS call.
-          const { saveGeneratedAgents } = await import('@/lib/orchestration/registry/store');
-          const savedIds = await saveGeneratedAgents(stage.id, agentData.agents);
+          // Embed the roster (including its voice binding) on the stage — it
+          // persists with the stage document via saveToStorage below — and
+          // mirror it into the in-memory registry. The agent-profile LLM has
+          // already bound each agent's voice (from availableVoices); the
+          // fallback for an invalid/unavailable voice is applied later at the
+          // live TTS call.
+          const generatedConfigs = agentData.agents as GeneratedAgentConfig[];
+          stage.generatedAgentConfigs = generatedConfigs;
+          const { applyGeneratedAgentsToRegistry } =
+            await import('@/lib/orchestration/registry/store');
+          const savedIds = applyGeneratedAgentsToRegistry(stage.id, generatedConfigs);
           settings.setSelectedAgentIds(savedIds);
           // Stage-derived, not a user choice — must not carry across classrooms.
           settings.setAgentSelectionIsUserSet(false);
@@ -869,7 +983,7 @@ function GenerationPreviewContent() {
       );
 
       if (!contentData.success || !contentData.content) {
-        throw new Error(contentData.error || t('generation.sceneGenerateFailed'));
+        throw new Error(sceneGenerationErrorMessage(contentData));
       }
 
       // Generate actions (activate actions step indicator)
@@ -892,7 +1006,7 @@ function GenerationPreviewContent() {
       );
 
       if (!data.success || !data.scene) {
-        throw new Error(data.error || t('generation.sceneGenerateFailed'));
+        throw new Error(sceneGenerationErrorMessage(data));
       }
       const firstScene = data.scene;
 
@@ -905,42 +1019,13 @@ function GenerationPreviewContent() {
           settings.ttsProvidersConfig?.[settings.ttsProviderId],
         )
       ) {
-        const speechActions = (firstScene.actions || []).filter(
-          (a: {
-            id: string;
-            type: string;
-            text?: string;
-          }): a is {
-            id: string;
-            type: 'speech';
-            text: string;
-            audioId?: string;
-          } => a.type === 'speech' && !!a.text,
+        const ttsResult = await generateTTSForScene(
+          firstScene,
+          languageDirective,
+          signal,
+          FOREGROUND_SCENE_RETRY_OPTIONS,
         );
-
-        let ttsFailCount = 0;
-        for (const action of speechActions) {
-          const audioId = `tts_${action.id}`;
-          action.audioId = audioId;
-          try {
-            await generateAndStoreTTS(
-              audioId,
-              action.text,
-              languageDirective,
-              signal,
-              FOREGROUND_SCENE_RETRY_OPTIONS,
-            );
-          } catch (err) {
-            if (isAbortError(err)) throw err;
-
-            log.warn(`[TTS] Failed for ${audioId}:`, err);
-            ttsFailCount++;
-          }
-        }
-
-        if (ttsFailCount > 0 && speechActions.length > 0) {
-          throw new Error(t('generation.speechFailed'));
-        }
+        if (!ttsResult.success) throw new Error(t('generation.speechFailed'));
       }
 
       // Add scene to store and navigate
@@ -1137,6 +1222,7 @@ function GenerationPreviewContent() {
     activeSteps.length > 0
       ? activeSteps[Math.min(currentStepIndex, activeSteps.length - 1)]
       : ALL_STEPS[0];
+  const activeStepText = getGenerationStepText(activeStep, session);
 
   if (isReviewingOutlines) {
     const outlineStepIndex = Math.max(
@@ -1327,14 +1413,14 @@ function GenerationPreviewContent() {
                         ? t('generation.generationFailed')
                         : isComplete
                           ? t('generation.generationComplete')
-                          : t(activeStep.title)}
+                          : t(activeStepText.title, activeStepText.titleValues)}
                     </h2>
                     <p className="text-muted-foreground text-base">
                       {error
                         ? error
                         : isComplete
                           ? t('generation.classroomReady')
-                          : statusMessage || t(activeStep.description)}
+                          : statusMessage || t(activeStepText.description)}
                     </p>
                   </motion.div>
                 </AnimatePresence>

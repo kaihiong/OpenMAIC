@@ -1,20 +1,13 @@
 import { useState, useRef, useCallback } from 'react';
 import { ASR_PROVIDERS } from '@/lib/audio/constants';
+import { getASRServerDisabledError } from '@/lib/audio/asr-enablement';
 import { normalizeASRUploadAudio } from '@/lib/audio/wav-utils';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('AudioRecorder');
 
-// TypeScript declarations for Web Speech API
-declare global {
-  interface Window {
-    // optional `?` to match @assistant-ui/core's global Window augmentation (identical modifiers)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Web Speech API not typed in lib.dom
-    SpeechRecognition?: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Web Speech API not typed in lib.dom
-    webkitSpeechRecognition?: any;
-  }
-}
+// Window.SpeechRecognition / webkitSpeechRecognition have minimal constructor
+// declarations in types/web-speech.d.ts; this hook casts the richer instance.
 
 export interface UseAudioRecorderOptions {
   onTranscription?: (text: string) => void;
@@ -109,7 +102,15 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
       // Get current ASR configuration
       if (typeof window !== 'undefined') {
         const { useSettingsStore } = await import('@/lib/store/settings');
-        const { asrProviderId, asrLanguage } = useSettingsStore.getState();
+        const { asrProviderId, asrLanguage, asrProvidersConfig } = useSettingsStore.getState();
+
+        // Browser-native ASR never reaches the server route, so enforce the
+        // operator force-off locally before invoking the Web Speech API.
+        const serverDisabledError = getASRServerDisabledError(asrProvidersConfig[asrProviderId]);
+        if (serverDisabledError) {
+          onError?.(serverDisabledError);
+          return;
+        }
 
         // Use browser native ASR if configured
         if (asrProviderId === 'browser-native') {
@@ -119,8 +120,10 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
             return;
           }
 
-          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-          const recognition = new SpeechRecognition();
+          const SpeechRecognitionCtor = (window.SpeechRecognition ||
+            window.webkitSpeechRecognition)!;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Web Speech API instance shape isn't in lib.dom
+          const recognition: any = new SpeechRecognitionCtor();
 
           recognition.lang = asrLanguage || 'zh-CN';
           recognition.continuous = continuous;

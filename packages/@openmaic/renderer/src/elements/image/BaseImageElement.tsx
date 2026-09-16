@@ -12,11 +12,15 @@ export interface BaseImageElementProps {
   elementInfo: PPTImageElement;
   /**
    * Optional render slot: replace the default <img> with custom content.
-   * The slot receives `(element, resolvedSrc)` and is responsible for rendering
-   * placeholders, retry UI, business-specific resolvers (e.g. AI media generation),
-   * etc. The package itself does not interpret `src` beyond passing it through.
+   * The slot receives `(element, resolvedSrc, defaultContent)` and is responsible
+   * for selecting placeholders, retry UI, or the renderer's prepared image.
+   * Its return value is authoritative, including `null`.
    */
-  renderImage?: (element: PPTImageElement, resolvedSrc: string) => ReactNode;
+  renderImage?: (
+    element: PPTImageElement,
+    resolvedSrc: string,
+    defaultContent: ReactNode,
+  ) => ReactNode;
 }
 
 export function BaseImageElement({ elementInfo, renderImage }: BaseImageElementProps) {
@@ -48,10 +52,47 @@ export function BaseImageElement({ elementInfo, renderImage }: BaseImageElementP
         } as CSSProperties;
       })()
     : {};
+  const defaultContent = src ? (
+    <>
+      <img
+        src={src}
+        draggable={false}
+        data-soft-edge={softEdge || undefined}
+        // Lazy + async decode: thumbnail surfaces (sidebar, nav rail, course
+        // cards) mount far more images than the viewport needs. In-viewport
+        // images are unaffected — the browser fetches them immediately.
+        // slideToPng forces these back to eager in its off-screen tree.
+        loading="lazy"
+        decoding="async"
+        style={{
+          position: 'absolute',
+          top: imgPosition.top,
+          left: imgPosition.left,
+          width: imgPosition.width,
+          height: imgPosition.height,
+          maxWidth: 'none',
+          maxHeight: 'none',
+          filter,
+          ...softEdgeMaskStyle,
+        }}
+        alt=""
+        onDragStart={(e) => e.preventDefault()}
+      />
+      {elementInfo.colorMask && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: elementInfo.colorMask,
+          }}
+        />
+      )}
+    </>
+  ) : null;
 
   return (
     <div
-      className="element-content"
+      className="base-element-image element-content"
       style={{
         position: 'absolute',
         top: `${elementInfo.top}px`,
@@ -85,41 +126,10 @@ export function BaseImageElement({ elementInfo, renderImage }: BaseImageElementP
               height: '100%',
               overflow: 'hidden',
               clipPath: clipShape.style,
+              pointerEvents: renderImage ? 'auto' : undefined,
             }}
           >
-            {renderImage ? (
-              renderImage(elementInfo, src)
-            ) : src ? (
-              <>
-                <img
-                  src={src}
-                  draggable={false}
-                  data-soft-edge={softEdge || undefined}
-                  style={{
-                    position: 'absolute',
-                    top: imgPosition.top,
-                    left: imgPosition.left,
-                    width: imgPosition.width,
-                    height: imgPosition.height,
-                    maxWidth: 'none',
-                    maxHeight: 'none',
-                    filter,
-                    ...softEdgeMaskStyle,
-                  }}
-                  alt=""
-                  onDragStart={(e) => e.preventDefault()}
-                />
-                {elementInfo.colorMask && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      backgroundColor: elementInfo.colorMask,
-                    }}
-                  />
-                )}
-              </>
-            ) : null}
+            {renderImage ? renderImage(elementInfo, src, defaultContent) : defaultContent}
           </div>
         </div>
       </div>

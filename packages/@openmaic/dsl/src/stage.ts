@@ -3,10 +3,12 @@
  *
  * This module owns the *structural* part of a lesson: the top-level `Stage`
  * container and a per-page `Scene` whose `content` is a discriminated union of
- * the universal content kinds (`SlideContent`, `QuizContent`). Richer,
- * faster-moving feature surfaces (playback `Action`s, Ultra-mode widgets, PBL
- * project configs) are deliberately *not* defined here — they stay in the
- * consuming app and are threaded in through `Scene`'s generic parameters.
+ * the universal content kinds (`SlideContent`, `QuizContent`). Interactive and
+ * PBL content contracts are exported alongside them and compose through
+ * `Scene`'s generic content parameter. `Scene`'s
+ * playback `actions` default to the contract's standard {@link Action} union
+ * (defined in `./action.ts`); apps can still extend widget payloads and action
+ * sets through `Scene`'s generic parameters.
  *
  * The split keeps `@openmaic/dsl` focused on the lesson skeleton while letting the
  * runtime engine, renderer, and importer share one source of truth for it.
@@ -14,9 +16,30 @@
  * No runtime dependencies. Pure types + pure discriminant guards only.
  */
 import type { Slide } from './slides.js';
+import type { Action } from './action.js';
 
-/** All scene kinds the contract is aware of. Feature kinds (interactive/pbl) are still valid `type` values — their *content* shapes live in the app and are composed in via {@link Scene}'s `TContent` parameter. */
+/** All scene kinds owned by the contract. */
 export type SceneType = 'slide' | 'quiz' | 'interactive' | 'pbl';
+
+/** Frozen set of every valid {@link SceneType}, for cheap membership checks. */
+export const SCENE_TYPES = [
+  'slide',
+  'quiz',
+  'interactive',
+  'pbl',
+] as const satisfies readonly SceneType[];
+
+// Compile-time exhaustiveness: every SceneType must appear in SCENE_TYPES.
+// `satisfies` above proves the converse (each entry is a valid SceneType); this
+// fails the build if the union gains a member the tuple is missing.
+type _SceneTypesExhaustive = [SceneType] extends [(typeof SCENE_TYPES)[number]] ? true : never;
+const _sceneTypesExhaustive: _SceneTypesExhaustive = true;
+void _sceneTypesExhaustive;
+
+/** Narrow an unknown value to a valid {@link SceneType}. Pure, no runtime deps. */
+export function isSceneType(value: unknown): value is SceneType {
+  return typeof value === 'string' && (SCENE_TYPES as readonly string[]).includes(value);
+}
 
 /** Lifecycle / interaction mode a {@link Stage} can be operated in. */
 export type StageMode = 'autonomous' | 'playback' | 'edit';
@@ -36,9 +59,55 @@ export interface VideoManifestEntry {
 export type VideoManifest = Record<string, VideoManifestEntry>;
 
 /**
- * Server-generated agent configuration. Embedded in persisted classroom JSON
- * so clients can hydrate the agent registry without relying on IndexedDB
- * pre-population. Only present for API-generated classrooms.
+ * Provider-neutral vocal identity for an agent, described as a 3-layer recipe.
+ * Consumed by any TTS integration: as an inline voice prompt where supported,
+ * or as the seed for a registered/cloned voice. Part of the contract so an
+ * agent's voice travels with the document (export/import, device switches)
+ * instead of living in device-local storage.
+ */
+export interface VoiceDesign {
+  /** gender / age / role */
+  identity: string;
+  /** pitch / vocal quality */
+  texture: string;
+  /** emotion / pace */
+  delivery: string;
+}
+
+/**
+ * A concrete TTS voice binding for an agent. `providerId` is an open string at
+ * the contract level — the set of available TTS providers is app-defined, and
+ * readers must treat an unknown provider as "no bound voice". Deliberately
+ * minimal: fields are added here only once a producer actually emits them.
+ */
+export interface AgentVoiceConfig {
+  providerId: string;
+  /** Model the voice was selected or enrolled for, when model-bound. */
+  modelId?: string;
+  voiceId: string;
+}
+
+/**
+ * Generated agent configuration. Embedded in the persisted stage document
+ * (`stage.generatedAgentConfigs`) so clients can hydrate the agent registry
+ * without relying on IndexedDB pre-population. Present for generated-roster
+ * classrooms; preset classrooms carry `agentIds` instead.
+ *
+ * The voice fields are optional and additive: documents written before they
+ * existed simply lack them, and readers treat an absent voice as "no bound
+ * voice" (the TTS path falls back at call time). Adding them did not change
+ * the meaning of any existing field, so within this codebase — whose
+ * structural validators tolerate unknown fields — the addition is
+ * non-breaking and does not bump `DSL_VERSION` (see `version.ts`).
+ *
+ * It is NOT transparent to schema-validating consumers, however: the
+ * generated `stage.schema.json` sets `additionalProperties: false` on every
+ * definition, so a cross-language consumer validating against a pinned copy
+ * of an older published schema artifact rejects any document that carries
+ * these fields. Under strict schema validation, additive fields ARE a
+ * breaking change — such consumers must upgrade their schema artifact in
+ * lockstep with the documents they accept. (A `DSL_VERSION` bump would not
+ * help them: an old schema rejects the new documents either way.)
  */
 export interface GeneratedAgentConfig {
   id: string;
@@ -48,6 +117,10 @@ export interface GeneratedAgentConfig {
   avatar: string;
   color: string;
   priority: number;
+  /** Bound TTS voice, when the generation pipeline selected one. */
+  voiceConfig?: AgentVoiceConfig;
+  /** 3-layer vocal descriptor for automatic voice synthesis/registration. */
+  voiceDesign?: VoiceDesign;
 }
 
 /**
@@ -141,50 +214,22 @@ export interface QuizContent {
 }
 
 /**
- * The universal scene-content kinds owned by the contract.
- *
- * App-specific kinds (interactive / pbl) are NOT members here: they carry
- * richer feature coupling (Ultra-mode widgets, PBL project configs) and stay in
- * the consuming app. Apps compose their full content union as
- * `SceneContent | InteractiveContent | PBLContent` and feed it to {@link Scene}'s
- * `TContent` parameter.
+ * The universal scene-content subset used by {@link Scene}'s compatibility
+ * default. Interactive and PBL content are also contract-owned and are composed
+ * into concrete scene unions through the generic content parameter.
  */
 export type SceneContent = SlideContent | QuizContent;
 
 /**
- * Scene - Represents a single page/scene in the course.
- *
- * Generic so the contract owns only the universal skeleton while the app
- * injects its concrete playback action set and full content union:
- *
- * ```ts
- * // app side
- * type AppScene = Scene<Action, AppSceneContent>;
- * ```
- *
- * Defaults (`TAction = never`, `TContent = SlideContent | QuizContent`) yield a
- * read-only, feature-free scene — what renderers / importers that only care
- * about the skeleton want. The `TContent` constraint is structural — any union
- * of objects tagged with a `type: SceneType` discriminant satisfies it — so an
- * app can pass its own wider content union (slide | quiz | interactive | pbl).
- *
- * @template TAction  - The playback action type (defaults to `never`, i.e. none).
- * @template TContent - The scene-content union; any object union tagged with a
- *                      `type: {@link SceneType}` discriminant (defaults to the
- *                      two universal kinds).
+ * The content-kind-independent fields of a {@link Scene}. Everything except the
+ * `type` discriminant and the `content` payload, which {@link Scene} binds
+ * together per kind.
  */
-export interface Scene<
-  TAction = never,
-  TContent extends { type: SceneType } = SlideContent | QuizContent,
-> {
+export interface SceneCore<TAction = Action> {
   id: string;
   stageId: string; // ID of the parent stage (for data integrity checks)
-  type: SceneType;
   title: string;
   order: number; // Display order
-
-  // Type-specific content
-  content: TContent;
 
   // Actions to execute during playback (app-injected)
   actions?: TAction[];
@@ -200,14 +245,51 @@ export interface Scene<
   updatedAt?: number;
 }
 
+/**
+ * Scene - Represents a single page/scene in the course.
+ *
+ * The scene-level `type` discriminant is **bound to its `content`**: a
+ * slide-typed scene must carry `SlideContent`, a quiz-typed scene `QuizContent`,
+ * and so on. This is a real invariant — consumers branch on `scene.type` and
+ * then read `scene.content` as the matching shape — so the contract enforces it
+ * at the type level rather than leaving the two free to disagree.
+ *
+ * Implemented as a distributive conditional over `TContent`: the binding holds
+ * per member of the content union, so the default `Scene<Action, SlideContent |
+ * QuizContent>` is `({ type: 'slide'; content: SlideContent } | { type: 'quiz';
+ * content: QuizContent }) & SceneCore`; consumers compose the exported
+ * interactive and PBL types into `TContent`, and every member ties its own
+ * `type` to its shape.
+ *
+ * ```ts
+ * // app side — widen content; widen actions only if the app adds its own
+ * type AppScene = Scene<Action, AppSceneContent>;
+ * ```
+ *
+ * Skeleton-only consumers that reject actions entirely can still opt out with
+ * `Scene<never, …>`.
+ *
+ * @template TAction  - The playback action type (defaults to the standard {@link Action} union).
+ * @template TContent - The scene-content union; any object union tagged with a
+ *                      `type: {@link SceneType}` discriminant (defaults to the
+ *                      slide/quiz compatibility subset). Each member binds its
+ *                      own `type`.
+ */
+export type Scene<
+  TAction = Action,
+  TContent extends { type: SceneType } = SlideContent | QuizContent,
+> = TContent extends unknown
+  ? SceneCore<TAction> & { type: TContent['type']; content: TContent }
+  : never;
+
 // ---------------------------------------------------------------------------
 // Pure discriminant guards
 // ---------------------------------------------------------------------------
 
 /**
  * Narrow a candidate to {@link SlideContent}. Accepts any value tagged with a
- * `type: SceneType` discriminant — including an app-widened content union that
- * adds interactive / pbl kinds beyond the contract's universal two.
+ * `type: SceneType` discriminant, including a consumer-specialized interactive
+ * content union.
  * Pure, no runtime deps.
  */
 export function isSlideContent<T extends { type: SceneType }>(
@@ -218,8 +300,8 @@ export function isSlideContent<T extends { type: SceneType }>(
 
 /**
  * Narrow a candidate to {@link QuizContent}. Accepts any value tagged with a
- * `type: SceneType` discriminant — including an app-widened content union that
- * adds interactive / pbl kinds beyond the contract's universal two.
+ * `type: SceneType` discriminant, including a consumer-specialized interactive
+ * content union.
  * Pure, no runtime deps.
  */
 export function isQuizContent<T extends { type: SceneType }>(

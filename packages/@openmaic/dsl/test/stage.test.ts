@@ -2,12 +2,18 @@ import { describe, it, expect, expectTypeOf } from 'vitest';
 import {
   isSlideContent,
   isQuizContent,
+  isInteractiveContent,
+  isPBLContent,
+  isPBLProject,
+  isWidgetType,
   type Scene,
   type SceneContent,
   type SceneType,
   type SlideContent,
   type QuizContent,
   type Whiteboard,
+  type Action,
+  type InteractiveContent,
 } from '@openmaic/dsl';
 
 /**
@@ -46,7 +52,7 @@ const quizContent: QuizContent = {
 };
 
 describe('SceneContent (contract layer)', () => {
-  it('is the universal two-way union (slide | quiz)', () => {
+  it('is the universal slide/quiz compatibility subset', () => {
     const c: SceneContent = slideContent;
     const c2: SceneContent = quizContent;
     expect(c.type).toBe('slide');
@@ -74,21 +80,62 @@ describe('discriminant guards', () => {
     }
   });
 
-  it('accepts an app-widened content union (interactive / pbl kinds)', () => {
-    // Regression: the generic Scene lets apps widen TContent beyond the
-    // contract's slide|quiz, so the guards must accept that widened union too
-    // (not just the narrow SceneContent).
-    type InteractiveContent = { type: 'interactive'; url: string };
+  it('accepts the contract interactive content type', () => {
     type Widened = SceneContent | InteractiveContent;
     const c: Widened = { type: 'interactive', url: 'https://example.com' };
     expect(isSlideContent(c)).toBe(false);
     expect(isQuizContent(c)).toBe(false);
   });
+
+  it('guards widget, interactive, and PBL content structurally', () => {
+    expect(isWidgetType('procedural-skill')).toBe(true);
+    expect(isWidgetType('video')).toBe(false);
+
+    expect(
+      isInteractiveContent({
+        type: 'interactive',
+        html: '<!doctype html><p>Hello</p>',
+        widgetConfig: { type: 'diagram' },
+      }),
+    ).toBe(true);
+    expect(isInteractiveContent({ type: 'interactive' })).toBe(false);
+    expect(isInteractiveContent({ type: 'interactive', widgetType: 'video' })).toBe(false);
+
+    const project = {
+      uiPhase: 'hero',
+      title: 'Project',
+      description: 'Build something.',
+      tags: [],
+      language: 'en-US',
+      proficiency: 'beginner',
+      status: 'active',
+      milestones: [],
+      roles: [],
+      submissions: [],
+      evaluations: [],
+      threads: [],
+      engagementEvents: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    expect(
+      isPBLContent({
+        type: 'pbl',
+        projectV2: project,
+      }),
+    ).toBe(true);
+    expect(isPBLContent({ type: 'pbl', projectConfig: [] })).toBe(false);
+    expect(isPBLProject(project)).toBe(true);
+    expect(isPBLProject({ ...project, uiPhase: 'bogus' })).toBe(false);
+    expect(isPBLProject({ ...project, status: 'bogus' })).toBe(false);
+    expect(isPBLProject({ ...project, milestones: {} })).toBe(false);
+  });
 });
 
 describe('Scene<TAction, TContent> generic', () => {
-  it('default Scene is the feature-free skeleton (no actions, slide/quiz content)', () => {
-    // No type args: actions default to never[], content to slide | quiz.
+  it('default Scene: optional actions and the slide/quiz compatibility subset', () => {
+    // No type args: actions default to the standard `Action` union and stay
+    // optional; content defaults to slide | quiz for app-widening compatibility.
     const s: Scene = {
       id: 'sc1',
       stageId: 'stg1',
@@ -105,7 +152,6 @@ describe('Scene<TAction, TContent> generic', () => {
   it('app-instantiation pattern: inject an action set and a wider content union', () => {
     // Simulates the app's `type AppScene = Scene<Action, AppSceneContent>`.
     type AppAction = { id: string; kind: 'speech'; text: string };
-    type InteractiveContent = { type: 'interactive'; url: string };
     type AppContent = SlideContent | QuizContent | InteractiveContent;
 
     const appScene: Scene<AppAction, AppContent> = {
@@ -122,12 +168,19 @@ describe('Scene<TAction, TContent> generic', () => {
     expect(appScene.actions?.[0].kind).toBe('speech');
   });
 
-  it('TAction defaults to never so the default Scene rejects concrete actions at the type level', () => {
-    // A default `Scene` with actions supplied must NOT type-check: `never[]`
-    // accepts no concrete element. Pin the exact type so the default can't
-    // silently drift to something that would accept a concrete action.
+  it('TAction defaults to the standard Action union so the default Scene carries playback actions', () => {
+    // The default `Scene` exposes the contract's standard `Action` union on
+    // `actions`. Pin the exact type so the default can't silently drift away
+    // from the promoted action set.
     type DefaultScene = Scene;
-    expectTypeOf<DefaultScene['actions']>().toEqualTypeOf<never[] | undefined>();
+    expectTypeOf<DefaultScene['actions']>().toEqualTypeOf<Action[] | undefined>();
+  });
+
+  it('skeleton-only consumers can still opt out of actions with Scene<never>', () => {
+    // Renderers / importers that only care about the lesson skeleton reject
+    // concrete actions by pinning `never`.
+    type SkeletonScene = Scene<never>;
+    expectTypeOf<SkeletonScene['actions']>().toEqualTypeOf<never[] | undefined>();
   });
 });
 
@@ -148,10 +201,7 @@ describe('Whiteboard', () => {
 });
 
 describe('SceneType', () => {
-  it('covers all four scene kinds even though the contract content is only slide|quiz', () => {
-    // The app relies on 'interactive' / 'pbl' being valid Scene.type values;
-    // the contract keeps all four in SceneType even though their content
-    // shapes are app-side.
+  it('covers all four contract scene kinds', () => {
     const types: SceneType[] = ['slide', 'quiz', 'interactive', 'pbl'];
     expect(types).toHaveLength(4);
   });

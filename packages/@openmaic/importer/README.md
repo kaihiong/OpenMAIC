@@ -93,6 +93,7 @@ func()
 |------|------|------|
 | `importPptx(input, options?)` | `(File \| Blob \| ArrayBuffer, ImportPptxOptions?) => Promise<Slide[]>` | 一站式：`.pptx` → `Slide[]`，等所有上传 settle 后再 resolve |
 | `parsedToSlides(json, options?)` | `(Output, ImportPptxOptions?) => Promise<Slide[]>` | 只做「中间 JSON → `Slide[]`」，给已经用 `parse()` 拿到 JSON 的场景 |
+| `normalizeImportedSlides(slides)` | `(Slide[]) => Slide[]` | DSL 合同边界：补默认值、丢弃无法修复的元素（`console.warn` 上报）。`parsedToSlides` / `importPptx` 已自动应用；直接调用 `transformParsedToSlides` 的消费方需要自己跑一遍以获得相同的输出契约 |
 | `OssUpload` | `(blob: Blob, filename: string, dir?: string) => Promise<string>` | 上传回调签名 |
 | `ImportPptxOptions` | `{ upload?: OssUpload }` | 选项对象 |
 | `CanvasSlide` | OpenMAIC `Slide` 类型 | 用于消费方做类型注解 |
@@ -105,6 +106,7 @@ func()
 import {
   importPptx,
   parsedToSlides,
+  normalizeImportedSlides,
   type OssUpload,
   type ImportPptxOptions,
   type CanvasSlide,
@@ -134,6 +136,8 @@ export function parsedToSlides(
   json: Output,
   options?: ImportPptxOptions,
 ): Promise<CanvasSlide[]>;
+
+export function normalizeImportedSlides(slides: CanvasSlide[]): CanvasSlide[];
 ```
 
 ## 📦 用法
@@ -185,10 +189,13 @@ const slides = await parsedToSlides(json, { upload });
 
 ## 📞 `upload` 回调被调用的时机
 
+视频 `poster` 与图片使用同一上传配置：未提供 `upload` 时保留 base64；提供后等待上传完成，将回调返回的 URL 写入 `poster`。上传失败时保留原始封面，已有远程 URL 不重复上传。回调可对接 OSS 或其他存储服务。
+
 | 元素类型 | 源数据 | filename 示例 | dir |
 |---------|--------|---------------|-----|
 | 背景图片 | base64 → Blob | `background_<timestamp>.png` | `a2m` |
 | 图片元素 | base64 → Blob | `image_<timestamp>.png` | `a2m` |
+| 视频封面 | base64 → Blob | `poster_<element-id>.<图片扩展名>` | `a2m` |
 | 数学公式渲染图 | base64 → Blob | `math_<timestamp>.png` | `a2m` |
 | 形状的图案填充 | base64 → Blob | `pattern_<timestamp>.png` | `a2m` |
 | 音频 | 直接是 Blob | `audio_<timestamp>.mp3` | `a2m/audio` |

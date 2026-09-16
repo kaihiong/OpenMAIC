@@ -1,21 +1,34 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { PPTTextElement } from '@openmaic/dsl';
 import { useElementShadow } from '../shared/useElementShadow';
 import { ElementOutline } from '../shared/ElementOutline';
+import { preservesPlainTextLineBreaks } from '../../utils/richText';
 
 export interface BaseTextElementProps {
   elementInfo: PPTTextElement;
   target?: string;
+  renderContent?: (element: PPTTextElement, defaultContent: ReactNode) => ReactNode;
 }
 
-export function BaseTextElement({ elementInfo, target }: BaseTextElementProps) {
+export function BaseTextElement({ elementInfo, target, renderContent }: BaseTextElementProps) {
   const { shadowStyle } = useElementShadow(elementInfo.shadow);
 
   const vAlign = elementInfo.vAlign ?? 'top';
   const justifyContent =
     vAlign === 'middle' ? 'center' : vAlign === 'bottom' ? 'flex-end' : 'flex-start';
+  const defaultContent = (
+    <div
+      className="text ProseMirror-static"
+      style={{
+        position: 'relative',
+        pointerEvents: target === 'thumbnail' ? 'none' : undefined,
+        whiteSpace: preservesPlainTextLineBreaks(elementInfo.content) ? 'pre-line' : undefined,
+      }}
+      dangerouslySetInnerHTML={{ __html: elementInfo.content }}
+    />
+  );
 
   return (
     <div
@@ -26,16 +39,6 @@ export function BaseTextElement({ elementInfo, target }: BaseTextElementProps) {
         left: `${elementInfo.left}px`,
         width: `${elementInfo.width}px`,
         height: `${elementInfo.height}px`,
-        // PowerPoint fills the entire shape rectangle with its solid/gradient
-        // fill, regardless of how much vertical room the text actually
-        // occupies. The inner .element-content div has height: auto so flex
-        // alignment can park the text at top/middle/bottom — but if the
-        // background lived there, a tall shape with short text (e.g. the 22
-        // empty paragraphs that author full-bleed black slide backgrounds in
-        // some decks) would only fill the content height and the slide's own
-        // background would bleed through below.
-        backgroundColor: elementInfo.fill,
-        opacity: elementInfo.opacity,
       }}
     >
       <div
@@ -44,6 +47,9 @@ export function BaseTextElement({ elementInfo, target }: BaseTextElementProps) {
           width: '100%',
           height: '100%',
           transform: `rotate(${elementInfo.rotate}deg)`,
+          // Fill the full text box and rotate it with the glyphs/outline.
+          backgroundColor: elementInfo.fill,
+          opacity: elementInfo.opacity,
           display: 'flex',
           flexDirection: 'column',
           justifyContent,
@@ -53,6 +59,9 @@ export function BaseTextElement({ elementInfo, target }: BaseTextElementProps) {
           className="element-content slide-renderer-prose"
           style={{
             position: 'relative',
+            boxSizing: 'border-box',
+            padding: '10px',
+            overflowWrap: 'break-word',
             width: elementInfo.vertical ? 'auto' : '100%',
             height: elementInfo.vertical ? '100%' : 'auto',
             textShadow: shadowStyle,
@@ -72,14 +81,7 @@ export function BaseTextElement({ elementInfo, target }: BaseTextElementProps) {
             height={elementInfo.height}
             outline={elementInfo.outline}
           />
-          <div
-            className="text ProseMirror-static"
-            style={{
-              position: 'relative',
-              pointerEvents: target === 'thumbnail' ? 'none' : undefined,
-            }}
-            dangerouslySetInnerHTML={{ __html: elementInfo.content }}
-          />
+          {renderContent?.(elementInfo, defaultContent) ?? defaultContent}
         </div>
       </div>
     </div>

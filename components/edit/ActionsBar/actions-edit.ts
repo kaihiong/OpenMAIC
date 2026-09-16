@@ -117,8 +117,15 @@ export function setSpeechTextClearAudioById(actions: Action[], id: string, text:
   const a = actions[index];
   if (!a || a.type !== 'speech') return actions;
   const next = actions.slice();
-  const cleaned = { ...a, text } as Action & { audioId?: string; audioUrl?: string };
+  const cleaned = {
+    ...a,
+    text,
+    audioInvalidated: true,
+  } as Action & { audioId?: string; audioUrl?: string; audioInvalidated?: boolean };
   delete cleaned.audioId;
+  // The legacy URL of an unconverted pair points at the old wording's
+  // narration just as much as the id does; keeping it would let a later
+  // conversion ingest superseded audio for the new text.
   delete cleaned.audioUrl;
   next[index] = cleaned;
   return next;
@@ -166,7 +173,9 @@ export function setAudioId(actions: Action[], index: number, audioId: string): A
   const a = actions[index];
   if (!a || a.type !== 'speech') return actions;
   const next = actions.slice();
-  next[index] = { ...a, audioId } as Action;
+  const updated = { ...a, audioId } as Action & { audioInvalidated?: boolean };
+  delete updated.audioInvalidated;
+  next[index] = updated;
   return next;
 }
 
