@@ -9,7 +9,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // its args) so no real provider client is constructed. provider-config stubs
 // echo the client-supplied key/baseUrl so a test can assert they are dropped
 // when a stage route overrides the client model.
-const mocks = vi.hoisted(() => ({ getModelCalls: [] as Array<Record<string, unknown>> }));
+const mocks = vi.hoisted(() => ({
+  getModelCalls: [] as Array<Record<string, unknown>>,
+  serverManaged: false,
+}));
 
 vi.mock('@/lib/ai/providers', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/ai/providers')>();
@@ -23,7 +26,7 @@ vi.mock('@/lib/ai/providers', async (importOriginal) => {
 });
 
 vi.mock('@/lib/server/provider-config', () => ({
-  isServerConfiguredProvider: () => false,
+  isServerConfiguredProvider: () => mocks.serverManaged,
   resolveApiKey: (_id: string, clientKey: string) => clientKey || 'server-key',
   resolveBaseUrl: (_id: string, clientBaseUrl?: string) => clientBaseUrl,
   resolveProxy: () => undefined,
@@ -37,6 +40,7 @@ describe('resolveModel — per-stage resolution order', () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.getModelCalls.length = 0;
+    mocks.serverManaged = false;
     delete process.env.MODEL_ROUTES;
     delete process.env.DEFAULT_MODEL;
   });
@@ -126,6 +130,44 @@ describe('resolveModel — per-stage resolution order', () => {
     expect(call.apiKey).toBe('client-key');
   });
 
+  it('rejects Bedrock unless the server operator explicitly enabled it', async () => {
+    const { resolveModel } = await import('@/lib/server/resolve-model');
+
+    await expect(
+      resolveModel({
+        modelString: 'bedrock:us.anthropic.claude-sonnet-5',
+        apiKey: 'client-supplied-token',
+      }),
+    ).rejects.toThrow(/must be enabled by the server operator/);
+    expect(mocks.getModelCalls).toHaveLength(0);
+  });
+
+  it('rejects a client-supplied Bedrock type for another built-in provider', async () => {
+    const { resolveModel } = await import('@/lib/server/resolve-model');
+
+    await expect(
+      resolveModel({
+        modelString: 'ollama:llama3.3',
+        providerType: 'bedrock',
+      }),
+    ).rejects.toThrow(/Provider type mismatch/);
+    expect(mocks.getModelCalls).toHaveLength(0);
+  });
+
+  it('allows Bedrock after the server operator explicitly enables it', async () => {
+    mocks.serverManaged = true;
+    const { resolveModel } = await import('@/lib/server/resolve-model');
+    const result = await resolveModel({
+      modelString: 'bedrock:us.anthropic.claude-sonnet-5',
+    });
+
+    expect(result.providerId).toBe('bedrock');
+    expect(mocks.getModelCalls.at(-1)).toMatchObject({
+      providerId: 'bedrock',
+      modelId: 'us.anthropic.claude-sonnet-5',
+    });
+  });
+
   it('uses a scene-content:<type> route over the base route and x-model', async () => {
     process.env.DEFAULT_MODEL = 'openai:gpt-5.4-mini';
     process.env.MODEL_ROUTES = JSON.stringify({
@@ -177,6 +219,24 @@ describe('resolveModel — per-stage resolution order', () => {
     const { resolveModel } = await import('@/lib/server/resolve-model');
     const r = await resolveModel({ stage: 'scene-content:interactive' });
     expect(r.thinkingConfig).toEqual({ enabled: true, budgetTokens: 8000 });
+  });
+
+  it('carries the agent driver thinking toggle onto its resolved connection', async () => {
+    process.env.MODEL_ROUTES = JSON.stringify({
+      'maic-agent-driver': {
+        model: 'openai:deepseek-v4-flash-vision-exp',
+        api: 'openai-completions',
+        thinking: { enabled: true },
+      },
+    });
+    const { resolveModel } = await import('@/lib/server/resolve-model');
+    const r = await resolveModel({ stage: 'maic-agent-driver' });
+
+    expect(r).toMatchObject({
+      providerId: 'openai',
+      modelId: 'deepseek-v4-flash-vision-exp',
+      thinkingConfig: { enabled: true },
+    });
   });
 
   it('routed-without-thinking drops client thinking (routed model uses its default)', async () => {

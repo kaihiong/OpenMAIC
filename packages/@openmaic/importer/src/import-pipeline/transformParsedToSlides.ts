@@ -1,5 +1,3 @@
-/* eslint-disable max-lines */
-/* eslint-disable no-console */
 import {
   parse as parsePptxDefault,
   type Shape,
@@ -31,6 +29,7 @@ import type {
 import { SHAPE_PATH_FORMULAS } from '../openmaic/configs/shapes';
 import { getSvgPathRange } from '../openmaic/utils/svgPathParser';
 import { parseVideoCodec, isVideoCodecSupported } from '../openmaic/utils/videoCodec';
+import { isPlaceholderDataUrl } from '../utils/mediaWebConvert';
 import type { ImportContext, TransformResult } from './types';
 
 type ParsedPptxJson = Awaited<ReturnType<typeof parsePptxDefault>>;
@@ -366,6 +365,46 @@ const shouldPreserveRotatedTextFrame = (
   );
 };
 
+/**
+ * Degrade-not-fail telemetry: report media that arrived as the blank
+ * placeholder (WMF / vector-only EMF cannot be converted in this environment).
+ * No-op unless the caller wired `ctx.onWarning`.
+ */
+/** Telemetry must never fail the import: a throwing sink is logged and swallowed. */
+function emitWarning(
+  ctx: ImportContext,
+  warning: { code: string; slideIndex: number; message: string },
+): void {
+  if (!ctx.onWarning) return;
+  try {
+    ctx.onWarning(warning);
+  } catch (err) {
+    console.error('[@openmaic/importer] onWarning sink threw (ignored):', err);
+  }
+}
+
+function warnUnconvertibleMedia(
+  ctx: ImportContext,
+  slideIndex: number,
+  what: string,
+  src: string | undefined,
+): void {
+  if (!isPlaceholderDataUrl(src)) return;
+  emitWarning(ctx, {
+    code: 'media-unconvertible',
+    slideIndex,
+    message: `${what} uses a media format that cannot be converted (WMF / vector EMF); it stays a blank placeholder`,
+  });
+}
+
+function escapeHtmlText(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 export async function transformParsedToSlides(
   json: ParsedPptxJson,
   ctx: ImportContext,
@@ -394,7 +433,7 @@ export async function transformParsedToSlides(
   // base64 图片上传改为并发
   const limitUpload = createConcurrencyLimiter(6);
   const uploadTasks: Promise<unknown>[] = [];
-  for (const item of json.slides) {
+  for (const [slideIndex, item] of json.slides.entries()) {
     const { type, value } = item.fill;
     let background: SlideBackground;
     if (type === 'image') {
@@ -406,6 +445,7 @@ export async function transformParsedToSlides(
           size: 'cover',
         },
       };
+      warnUnconvertibleMedia(ctx, slideIndex, 'Slide background image', value.picBase64);
       if (value.picBase64 && value.picBase64.startsWith('data:')) {
         const bg = background.image!;
         uploadTasks.push(
@@ -538,6 +578,7 @@ export async function transformParsedToSlides(
             let pattern: string | undefined;
             if (el.fill.type === 'image') {
               pattern = el.fill.value.picBase64;
+              warnUnconvertibleMedia(ctx, slideIndex, 'A text frame image fill', pattern);
             }
             const shapeEl: PPTShapeElement = {
               type: 'shape',
@@ -620,6 +661,7 @@ export async function transformParsedToSlides(
           }
         } else if (el.type === 'image') {
           const imageSrc = el.src;
+          warnUnconvertibleMedia(ctx, slideIndex, 'An image element', imageSrc);
 
           const element: PPTImageElement = {
             type: 'image',
@@ -747,37 +789,78 @@ export async function transformParsedToSlides(
                 rotate: 0,
               };
               slide.elements.push(latexElement);
+              if ((el as { degraded?: boolean }).degraded) {
+                emitWarning(ctx, {
+                  code: 'formula-degraded',
+                  slideIndex,
+                  message:
+                    'A formula was converted from its OLE equation but some constructs were approximated (e.g. pile/matrix flattened); review the rendered formula',
+                });
+              }
               usedKatex = true;
             } catch (error) {
               console.warn('[PPTX导入] KaTeX 无法渲染公式，回退为图片:', error);
             }
           }
           if (!usedKatex) {
-            const mathElement: PPTImageElement = {
-              type: 'image',
-              id: nanoid(10),
-              src: el.picBase64,
-              width: el.width,
-              height: el.height,
-              left: el.left,
-              top: el.top,
-              fixedRatio: true,
-              rotate: 0,
-            };
-            slide.elements.push(mathElement);
-            if (el.picBase64 && el.picBase64.startsWith('data:')) {
-              uploadTasks.push(
-                limitUpload(() =>
-                  ctx.uploadBase64Image(el.picBase64, `math_${Date.now()}.png`, 'a2m'),
-                )
-                  .then((url) => {
-                    mathElement.src = url;
-                  })
-                  .catch((error) => {
-                    console.error('数学公式图片上传失败:', error);
-                  }),
-              );
+            // Degrade ladder: when the fallback picture carries real pixels
+            // (e.g. an EMF with an embedded bitmap), keep it. When even the
+            // fallback is the blank placeholder — the common case for legacy
+            // OLE equation objects whose preview is WMF — and the math node
+            // kept its plain text, emit a text element so the formula content
+            // survives at all instead of a stretched placeholder pixel.
+            const fallbackIsPlaceholder = isPlaceholderDataUrl(el.picBase64);
+            if (fallbackIsPlaceholder && el.text) {
+              const textElement: PPTTextElement = {
+                type: 'text',
+                id: nanoid(10),
+                width: el.width,
+                height: el.height,
+                left: el.left,
+                top: el.top,
+                rotate: 0,
+                defaultFontName: theme.fontName,
+                defaultColor: theme.fontColor,
+                content: `<div><p style="line-height: 1; white-space: nowrap;">${escapeHtmlText(el.text)}</p></div>`,
+                fill: '',
+              };
+              slide.elements.push(textElement);
+            } else {
+              const mathElement: PPTImageElement = {
+                type: 'image',
+                id: nanoid(10),
+                src: el.picBase64,
+                width: el.width,
+                height: el.height,
+                left: el.left,
+                top: el.top,
+                fixedRatio: true,
+                rotate: 0,
+              };
+              slide.elements.push(mathElement);
+              if (el.picBase64 && el.picBase64.startsWith('data:')) {
+                uploadTasks.push(
+                  limitUpload(() =>
+                    ctx.uploadBase64Image(el.picBase64, `math_${Date.now()}.png`, 'a2m'),
+                  )
+                    .then((url) => {
+                      mathElement.src = url;
+                    })
+                    .catch((error) => {
+                      console.error('数学公式图片上传失败:', error);
+                    }),
+                );
+              }
             }
+            emitWarning(ctx, {
+              code: 'formula-fallback-image',
+              slideIndex,
+              message: fallbackIsPlaceholder
+                ? el.text
+                  ? 'A formula could not be converted to LaTeX and its fallback picture is unconvertible (WMF); kept its plain text instead'
+                  : 'A formula could not be converted to LaTeX and its fallback picture is unconvertible (WMF); it stays a blank placeholder'
+                : 'A formula could not be converted to LaTeX; the original fallback picture is used',
+            });
           }
         } else if (el.type === 'audio') {
           console.log('🔍 音频元素完整信息:', JSON.stringify(el, null, 2));
@@ -831,7 +914,29 @@ export async function transformParsedToSlides(
             autoplay: false,
             poster: el.src || '',
           };
+          warnUnconvertibleMedia(ctx, slideIndex, 'A video poster', el.src);
           slide.elements.push(videoElement);
+
+          // Use the same injectable uploader as other images. The default
+          // context returns the data URL unchanged when no upload is configured.
+          if (el.src?.startsWith('data:image/')) {
+            const extension =
+              el.src
+                .match(/^data:image\/([^;,]+)/)?.[1]
+                .replace('jpeg', 'jpg')
+                .replace('svg+xml', 'svg') || 'png';
+            uploadTasks.push(
+              limitUpload(() =>
+                ctx.uploadBase64Image(el.src!, `poster_${videoElement.id}.${extension}`, 'a2m'),
+              )
+                .then((url) => {
+                  videoElement.poster = url;
+                })
+                .catch((error) => {
+                  console.error('视频封面上传失败:', error);
+                }),
+            );
+          }
 
           // 上传到 OSS
           if (el.blob && el.blob.startsWith('blob:')) {
@@ -904,6 +1009,7 @@ export async function transformParsedToSlides(
             if (el.fill?.type === 'image') {
               pattern = el.fill.value.picBase64;
               opacity = el.fill.value.opacity;
+              warnUnconvertibleMedia(ctx, slideIndex, 'A shape image fill', pattern);
             }
             const fill = el.fill?.type === 'color' ? el.fill.value : '';
 
@@ -984,14 +1090,14 @@ export async function transformParsedToSlides(
               element.path = el.path;
               element.viewBox = [originWidth, originHeight];
             }
-            if (el.shapType === 'custom') {
-              if (el.path!.indexOf('NaN') !== -1) {
+            if (el.shapType === 'custom' && el.path) {
+              if (el.path.indexOf('NaN') !== -1) {
                 if (element.width === 0) element.width = 0.1;
                 if (element.height === 0) element.height = 0.1;
-                element.path = el.path!.replace(/NaN/g, '0');
+                element.path = el.path.replace(/NaN/g, '0');
               } else {
                 element.special = true;
-                element.path = el.path!;
+                element.path = el.path;
               }
               const { maxX, maxY } = getSvgPathRange(element.path);
               element.viewBox = [maxX || originWidth, maxY || originHeight];

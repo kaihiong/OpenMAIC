@@ -66,6 +66,7 @@ export function StaticTable({ elementInfo }: StaticTableProps) {
       className="slide-renderer-prose"
       style={{
         width: '100%',
+        height: '100%',
         borderCollapse: 'collapse',
         tableLayout: 'fixed',
       }}
@@ -131,9 +132,7 @@ export function StaticTable({ elementInfo }: StaticTableProps) {
                           ? 'flex-start'
                           : cell.vAlign === 'bottom'
                             ? 'flex-end'
-                            : cell.vAlign === 'middle'
-                              ? 'center'
-                              : undefined,
+                            : 'center',
                     }}
                     // cell.text is already final HTML (transformParsedToSlides
                     // escapes text + converts \n/spaces and keeps <p> positioning

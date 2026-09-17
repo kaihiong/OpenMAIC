@@ -20,6 +20,7 @@ import {
   Table2,
   type LucideIcon,
 } from 'lucide-react';
+import { elementRefLabel } from '@/lib/workbench/element-refs';
 
 /** Translator fn (matches useI18n's `t`) — passed in so this module stays hook-free. */
 type TFn = (key: string, options?: Record<string, unknown>) => string;
@@ -32,6 +33,8 @@ export interface CueMeta {
   glyph: string;
   /** top accent bar tint for the cue card */
   accent: string;
+  /** dashed-border tint used by a "needs target" cue card */
+  dash: string;
 }
 
 const META: Record<string, CueMeta> = {
@@ -40,54 +43,63 @@ const META: Record<string, CueMeta> = {
     labelKey: 'edit.cue.speech',
     glyph: 'text-primary bg-primary/10 dark:text-primary',
     accent: 'bg-primary/40',
+    dash: 'border-primary/40',
   },
   spotlight: {
     icon: Focus,
     labelKey: 'edit.cue.spotlight',
     glyph: 'text-amber-600 bg-amber-500/10 dark:text-amber-400',
     accent: 'bg-amber-400/70',
+    dash: 'border-amber-400/70',
   },
   laser: {
     icon: Crosshair,
     labelKey: 'edit.cue.laser',
     glyph: 'text-rose-600 bg-rose-500/10 dark:text-rose-400',
     accent: 'bg-rose-400/70',
+    dash: 'border-rose-400/70',
   },
   wb_open: {
     icon: Presentation,
     labelKey: 'edit.cue.whiteboardOpen',
     glyph: 'text-sky-600 bg-sky-500/10 dark:text-sky-400',
     accent: 'bg-sky-400/70',
+    dash: 'border-primary/40',
   },
   wb_draw_text: {
     icon: PenLine,
     labelKey: 'edit.cue.whiteboardText',
     glyph: 'text-sky-600 bg-sky-500/10 dark:text-sky-400',
     accent: 'bg-sky-400/70',
+    dash: 'border-primary/40',
   },
   wb_draw_shape: {
     icon: Shapes,
     labelKey: 'edit.cue.whiteboardShape',
     glyph: 'text-sky-600 bg-sky-500/10 dark:text-sky-400',
     accent: 'bg-sky-400/70',
+    dash: 'border-primary/40',
   },
   wb_draw_latex: {
     icon: Sigma,
     labelKey: 'edit.cue.whiteboardLatex',
     glyph: 'text-sky-600 bg-sky-500/10 dark:text-sky-400',
     accent: 'bg-sky-400/70',
+    dash: 'border-primary/40',
   },
   wb_draw_table: {
     icon: Table2,
     labelKey: 'edit.cue.whiteboardTable',
     glyph: 'text-sky-600 bg-sky-500/10 dark:text-sky-400',
     accent: 'bg-sky-400/70',
+    dash: 'border-primary/40',
   },
   discussion: {
     icon: Flag,
     labelKey: 'edit.cue.discussion',
     glyph: 'text-yellow-600 bg-yellow-500/10 dark:text-yellow-400',
     accent: 'bg-yellow-400/70',
+    dash: 'border-primary/40',
   },
 };
 
@@ -96,6 +108,7 @@ const FALLBACK: CueMeta = {
   labelKey: 'edit.cue.action',
   glyph: 'text-muted-foreground bg-muted',
   accent: 'bg-muted-foreground/30',
+  dash: 'border-muted-foreground/30',
 };
 
 export function cueMeta(type: string): CueMeta {
@@ -110,23 +123,7 @@ export function cueLabel(type: string, t: TFn): string {
 /** Cue types that target a canvas element (so canvas pick mode applies). */
 export const ELEMENT_BOUND = new Set(['spotlight', 'laser', 'play_video']);
 
-const EL_TYPE_KEY: Record<string, string> = {
-  text: 'edit.element.text',
-  image: 'edit.element.image',
-  shape: 'edit.element.shape',
-  line: 'edit.element.line',
-  chart: 'edit.element.chart',
-  table: 'edit.element.table',
-  latex: 'edit.element.latex',
-  video: 'edit.element.video',
-  audio: 'edit.element.audio',
-  code: 'edit.element.code',
-};
-
 /** Human label for a slide element (localized type + a short content snippet). */
 export function elementLabel(el: { type: string; content?: string }, t: TFn): string {
-  const typeLabel = EL_TYPE_KEY[el.type] ? t(EL_TYPE_KEY[el.type]) : el.type;
-  const raw = (el.content ?? '').replace(/<[^>]+>/g, '').trim();
-  const snip = raw ? ` · ${raw.slice(0, 16)}${raw.length > 16 ? '…' : ''}` : '';
-  return `${typeLabel}${snip}`;
+  return elementRefLabel(el, t);
 }

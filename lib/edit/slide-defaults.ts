@@ -19,11 +19,11 @@ const DEFAULT_THEME: SlideTheme = {
  * Matches the SceneBuilder default theme so user-added slides look the
  * same as AI-generated ones until customized.
  *
- * Seeded with a single empty speech action so the slide is playable from the
- * moment it's inserted: the playback engine skips a scene with *zero* actions,
- * which would make a freshly inserted slide silently vanish on play. The empty
- * clip also surfaces as the first editable line in the script timeline — an
- * obvious "fill me in" cue for the user / MAIC Agent.
+ * Starts with NO actions: the playback engine dwells on a zero-action scene
+ * (showing the slide for a short beat) rather than skipping it, so a fresh
+ * slide is playable without seeding a meaningless empty speech clip. The empty
+ * script timeline surfaces inline as a "fill me in" cue for the user / MAIC
+ * Agent instead.
  */
 export function createBlankSlideScene(stageId: string, title: string, order: number): Scene {
   const slide: Slide = {
@@ -41,7 +41,7 @@ export function createBlankSlideScene(stageId: string, title: string, order: num
     canvas: slide,
   };
 
-  const actions: Action[] = [{ id: nanoid(), type: 'speech', text: '' }];
+  const actions: Action[] = [];
 
   return {
     id: nanoid(),
@@ -101,8 +101,9 @@ export function duplicateSlideScene(source: Scene, copySuffix: string, order: nu
     const next: Record<string, unknown> = { ...structuredClone(action), id: nanoid() };
     const elId = next.elementId;
     if (typeof elId === 'string' && elIdMap[elId]) next.elementId = elIdMap[elId];
-    // Drop both audio refs — playback prefers audioUrl, so leaving it would make
-    // the copy keep playing the source's server-generated TTS.
+    // Drop the audio ref so the copy re-derives / regenerates its own narration
+    // audio instead of playing the source's. The legacy URL of an unconverted
+    // pair points at the source's narration just as much as the id does.
     delete next.audioId;
     delete next.audioUrl;
     return next as unknown as Action;
@@ -111,6 +112,11 @@ export function duplicateSlideScene(source: Scene, copySuffix: string, order: nu
   return {
     ...source,
     id: nanoid(),
+    // A duplicate is NOT generated from the source's outline, so it must not
+    // inherit `outlineId` — otherwise the editor agent would resolve the copy's
+    // context to the original slide's outline. Cleared so resolveSceneOutline
+    // falls back to the copy's own title / content.
+    outlineId: undefined,
     title,
     order,
     content,

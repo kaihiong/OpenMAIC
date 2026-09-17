@@ -6,8 +6,8 @@
  */
 
 import type { NextRequest } from 'next/server';
-import { getModel, parseModelString, type ModelWithInfo } from '@/lib/ai/providers';
-import type { ThinkingConfig } from '@/lib/types/provider';
+import { getModel, getProvider, parseModelString, type ModelWithInfo } from '@/lib/ai/providers';
+import type { ProviderType, ThinkingConfig } from '@/lib/types/provider';
 import {
   isServerConfiguredProvider,
   resolveApiKey,
@@ -15,6 +15,7 @@ import {
   resolveProxy,
 } from '@/lib/server/provider-config';
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
+import { fetchWithRedirectValidation } from '@/lib/server/fetch-with-redirect-validation';
 import { getStageRoute, type LlmStage } from '@/lib/server/model-routes';
 
 export interface ResolvedModel extends ModelWithInfo {
@@ -80,12 +81,32 @@ export async function resolveModel(params: {
   const clientBaseUrlParam = routed ? undefined : params.baseUrl;
 
   // Server-managed providers are admin-owned: the operator's key and base URL
-  // are authoritative and any client-sent override is ignored. SSRF validation
-  // therefore applies only to unmanaged providers, where the base URL really is
-  // client-supplied. (Server-configured URLs are trusted by the operator.)
+  // are authoritative and any client-sent override is ignored. Origin URL
+  // validation therefore applies only to unmanaged providers, where the base
+  // URL really is client-supplied. (Server-configured URLs are trusted by the
+  // operator.) Every provider fetch still runs through a transport that
+  // re-validates redirect hops: no upstream can be assumed to redirect only to
+  // public targets, so the hop target is checked regardless of who chose the
+  // origin.
   const managed = isServerConfiguredProvider('providers', providerId);
+  const registeredProviderType = getProvider(providerId)?.type;
+  if (
+    clientProviderType &&
+    registeredProviderType &&
+    clientProviderType !== registeredProviderType
+  ) {
+    throw new Error(
+      `Provider type mismatch for ${providerId}: expected ${registeredProviderType}, received ${clientProviderType}.`,
+    );
+  }
+  const effectiveProviderType = (clientProviderType || registeredProviderType) as
+    | ProviderType
+    | undefined;
+  if (effectiveProviderType === 'bedrock' && (providerId !== 'bedrock' || !managed)) {
+    throw new Error('Amazon Bedrock must be enabled by the server operator before it can be used.');
+  }
   const clientBaseUrl = managed ? undefined : clientBaseUrlParam || undefined;
-  if (clientBaseUrl && process.env.NODE_ENV === 'production') {
+  if (clientBaseUrl) {
     const ssrfError = await validateUrlForSSRF(clientBaseUrl);
     if (ssrfError) {
       throw new Error(ssrfError);
@@ -101,7 +122,10 @@ export async function resolveModel(params: {
     apiKey,
     baseUrl,
     proxy,
-    providerType: clientProviderType as 'openai' | 'anthropic' | 'google' | undefined,
+    providerType: clientProviderType as ProviderType | undefined,
+    // Re-validate every redirect hop of the outbound request (see
+    // fetchWithRedirectValidation); the base URL above is checked at origin.
+    fetchImpl: fetchWithRedirectValidation,
   });
 
   // Thinking arbitration mirrors model routing — the route carries a full

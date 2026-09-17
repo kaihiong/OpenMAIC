@@ -39,6 +39,7 @@ export type { MediaMode } from './serializer/RenderContext';
 export {
   importPptx,
   parsedToSlides,
+  normalizeImportedSlides,
   transformParsedToSlides,
   createMockImportContext,
 } from './import-pipeline';
@@ -46,6 +47,8 @@ export type {
   OssUpload,
   ImportPptxOptions,
   ImportContext,
+  ImportWarning,
   TransformResult,
 } from './import-pipeline';
 export type { Slide as CanvasSlide } from '@openmaic/dsl';
+export { isPlaceholderDataUrl } from './utils/mediaWebConvert';
