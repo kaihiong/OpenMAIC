@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { signJWT, COOKIE_NAME } from '@/lib/auth/jwt';
+import { sessionCookieOptions } from '@/lib/auth/session-cookie';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
 
 export async function POST(req: Request) {
@@ -46,11 +47,8 @@ export async function POST(req: Request) {
 
     const cookieStore = await cookies();
     cookieStore.set(COOKIE_NAME, token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
+      ...sessionCookieOptions(),
       maxAge: 8 * 60 * 60,
-      secure: process.env.NODE_ENV === 'production',
     });
 
     return apiSuccess({
