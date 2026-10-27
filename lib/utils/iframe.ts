@@ -41,6 +41,37 @@ const STORAGE_SHIM = `<script data-iframe-storage-shim>
 </script>`;
 
 /**
+ * App theme bridge. Mirrors the host's light/dark setting onto the document as
+ * `<html data-theme="light|dark">` (plus a `dark` class and `color-scheme`), so
+ * generated pages can theme themselves from CSS variables. Starts from the OS
+ * preference (the app's own default is "system"), asks the parent for the real
+ * value, and then follows `{ type: 'maic-theme', theme }` messages live — a theme
+ * toggle restyles the page without reloading it or losing the learner's state.
+ * Pages that draw with JS (canvas, charts) redraw on the `maic-themechange` event.
+ */
+const THEME_SHIM = `<script data-iframe-theme-shim>
+(function () {
+  function apply(theme) {
+    theme = theme === 'dark' ? 'dark' : 'light';
+    var root = document.documentElement;
+    if (root.getAttribute('data-theme') === theme) return;
+    root.setAttribute('data-theme', theme);
+    root.classList.toggle('dark', theme === 'dark');
+    root.style.colorScheme = theme;
+    try { window.dispatchEvent(new CustomEvent('maic-themechange', { detail: { theme: theme } })); } catch (e) {}
+  }
+  var initial = 'light';
+  try { if (window.matchMedia('(prefers-color-scheme: dark)').matches) initial = 'dark'; } catch (e) {}
+  apply(initial);
+  window.addEventListener('message', function (e) {
+    var d = e && e.data;
+    if (d && d.type === 'maic-theme' && (d.theme === 'dark' || d.theme === 'light')) apply(d.theme);
+  });
+  try { window.parent.postMessage({ __maicInteractive: true, kind: 'theme-request' }, '*'); } catch (e) {}
+})();
+</script>`;
+
+/**
  * Runtime-error capture, injected as the VERY FIRST script so it observes errors
  * from the storage shim and every page script that follows. Generated interactive
  * pages frequently die on a runtime error (a `JSON.parse` of malformed config, a
@@ -389,10 +420,22 @@ export function patchHtmlForIframe(html: string): string {
   /* Fix min-h-screen: in iframes 100vh is the iframe height, which is correct,
      but ensure body actually fills it */
   body { min-height: 100vh; }
+  /* Light theme page background is white. Out-specifies the page's own :root token,
+     so pages generated with the older grey --bg follow it too. */
+  :root:not([data-theme="dark"]) { --bg: #FFFFFF; }
 </style>`;
 
   const injection =
-    '\n' + ERROR_CAPTURE_SHIM + '\n' + ELEMENT_PICKER_SHIM + '\n' + STORAGE_SHIM + '\n' + iframeCss;
+    '\n' +
+    ERROR_CAPTURE_SHIM +
+    '\n' +
+    ELEMENT_PICKER_SHIM +
+    '\n' +
+    STORAGE_SHIM +
+    '\n' +
+    THEME_SHIM +
+    '\n' +
+    iframeCss;
 
   return injectIntoDocumentHead(html, injection);
 }

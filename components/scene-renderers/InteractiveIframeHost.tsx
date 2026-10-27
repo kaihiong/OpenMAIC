@@ -17,6 +17,7 @@ import { intersectClientBoxes } from '@/lib/edit/visible-client-rect';
 import { useCanvasStore } from '@/lib/store/canvas';
 import { useElementRefsStore } from '@/lib/store/element-refs';
 import { useI18n } from '@/lib/hooks/use-i18n';
+import { useTheme } from '@/lib/hooks/use-theme';
 import {
   ELEMENT_REF_SELECTOR_MAX,
   ELEMENT_SNAPSHOT_MAX,
@@ -231,6 +232,7 @@ function PooledIframe({
   onPlaybackCancel,
 }: PooledIframeProps) {
   const { t } = useI18n();
+  const { resolvedTheme } = useTheme();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const registerIframe = useWidgetIframeStore((s) => s.registerIframe);
   const getSendMessage = useWidgetIframeStore((s) => s.getSendMessage);
@@ -256,6 +258,20 @@ function PooledIframe({
     registerIframe(sceneId, send);
     return () => registerIframe(sceneId, null);
   }, [sceneId, registerIframe]);
+
+  // Mirror the app's light/dark theme into the page (see THEME_SHIM in iframe.ts).
+  // Posted on every theme change and per document version; the iframe's onLoad
+  // and its own 'theme-request' cover a document that wasn't listening yet.
+  const themeRef = useRef(resolvedTheme);
+  const postTheme = () =>
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: 'maic-theme', theme: themeRef.current },
+      '*',
+    );
+  useEffect(() => {
+    themeRef.current = resolvedTheme;
+    iframeRef.current?.contentWindow?.postMessage({ type: 'maic-theme', theme: resolvedTheme }, '*');
+  }, [resolvedTheme, entry.srcDoc]);
 
   useEffect(() => {
     const send = getSendMessage(sceneId);
@@ -293,6 +309,10 @@ function PooledIframe({
         | (InteractivePickerMessage & { errorKind?: string; message?: unknown })
         | undefined;
       if (!d || d.__maicInteractive !== true) return;
+      if (d.kind === 'theme-request') {
+        postTheme();
+        return;
+      }
       if (d.kind === 'runtime-error') {
         const kind = typeof d.errorKind === 'string' ? d.errorKind : 'error';
         const msg = typeof d.message === 'string' ? d.message : String(d.message ?? '');
@@ -373,6 +393,7 @@ function PooledIframe({
         src={entry.srcDoc ? undefined : entry.src}
         style={iframeStyle}
         title={`Interactive Scene ${sceneId}`}
+        onLoad={postTheme}
         sandbox="allow-scripts allow-forms allow-popups"
       />
       {playbackArmed && (

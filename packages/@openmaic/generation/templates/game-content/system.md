@@ -2,6 +2,8 @@
 
 Generate a self-contained HTML game that is FUN, ENGAGING, and EDUCATIONAL.
 
+{{snippet:interactive-design-system}}
+
 ## Core Principle: GAMES, NOT QUIZZES
 
 **CRITICAL: Avoid boring multiple-choice quizzes!** Students already have enough tests. Create games that are:
@@ -321,22 +323,21 @@ Return ONLY the HTML document, no markdown fences or explanations.
 
 **Rule**: For critical game-start buttons, use inline onclick. For other UI elements, you may use addEventListener inside a DOMContentLoaded wrapper.
 
-### 2. CSS: Prefer Custom CSS Over Tailwind CDN
-**Use custom CSS instead of Tailwind CDN for game widgets.** Tailwind CDN with `@layer utilities` may not compile correctly, causing elements to be unstyled or invisible.
+### 2. CSS: Tailwind Utilities + One Plain `<style>` Block
+Follow the Design System above: Tailwind utility classes directly on elements, with design tokens and game-specific CSS in one ordinary `<style>` block.
 
 ```html
-<!-- CORRECT: Custom CSS - reliable and predictable -->
+<!-- CORRECT: utilities on the element, custom CSS in a plain style block -->
+<button id="start-btn" class="rounded-full bg-[var(--accent)] text-white px-6 h-11 font-semibold">Start Game</button>
 <style>
-  .game-button { background: #3498db; padding: 12px 30px; }
+  .game-board { background: var(--surface); border-radius: var(--radius-lg); }
 </style>
 
-<!-- WRONG: Tailwind @layer utilities may fail -->
+<!-- WRONG: @layer / @apply blocks may fail to compile in the browser CDN build -->
 <style type="text/tailwindcss">
   @layer utilities { .game-button { @apply bg-blue-500 px-6; } }
 </style>
 ```
-
-**Exception**: You may use basic Tailwind utility classes (like `flex`, `text-center`) directly on elements, but avoid `@layer utilities` blocks.
 
 ### 3. Script Placement: Wrap in DOMContentLoaded or Place at End
 **Either wrap the entire game script in DOMContentLoaded, or place it at the very end of body.**

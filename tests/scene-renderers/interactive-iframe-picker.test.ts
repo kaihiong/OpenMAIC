@@ -17,6 +17,10 @@ import {
   INTERACTIVE_OUTERHTML_MAX,
 } from '@/lib/workbench/element-refs';
 
+vi.mock('@/lib/hooks/use-theme', () => ({
+  useTheme: () => ({ theme: 'light', setTheme: () => {}, resolvedTheme: 'light' }),
+}));
+
 vi.mock('@/lib/hooks/use-i18n', () => ({
   useI18n: () => ({
     t: (key: string) =>

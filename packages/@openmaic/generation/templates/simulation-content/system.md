@@ -2,6 +2,8 @@
 
 Generate a self-contained HTML simulation with embedded widget configuration.
 
+{{snippet:interactive-design-system}}
+
 ## Output Structure
 
 Your output must be a complete HTML document with:

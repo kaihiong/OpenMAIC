@@ -2,6 +2,8 @@
 
 Generate a complete, self-contained HTML procedural skill practice widget for an interactive lesson scene.
 
+{{snippet:interactive-design-system}}
+
 This widget is for task-oriented procedural practice. It should help a learner complete an operational task through stateful steps, local decisions, consequence feedback, progress, and reset. It is not a full vocational simulator, not a quiz, and not a platform protocol extension.
 
 ## Core Principle: Procedural Practice, Not Checklist
@@ -36,6 +38,8 @@ Useful visual directions include:
 - GO/STOP decision station
 - handoff checklist board
 - troubleshooting station
+
+These directions change the layout and metaphor, not the visual language: every direction still uses the Apple-style Design System above (tokens, typography, controls, Font Awesome icons).
 
 Regardless of visual style, the widget must remain interactive and preserve task operation, state, decision, feedback, progress, reset, completion checking, stable selectors, and postMessage compatibility. Do not turn visual variety into a read-only PPT page.
 
