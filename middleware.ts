@@ -54,7 +54,11 @@ export async function middleware(request: NextRequest) {
       );
     }
 
-    return NextResponse.redirect(new URL('/login', request.url));
+    // Fork: remember where the visitor was going, so links into the app (such as
+    // ALEX+'s "Create in OpenMAIC" launch link) still work after signing in.
+    const loginUrl = new URL('/login', request.url);
+    if (pathname !== '/') loginUrl.searchParams.set('next', pathname + request.nextUrl.search);
+    return NextResponse.redirect(loginUrl);
   }
 
   // --- Legacy access code mode ---

@@ -116,6 +116,7 @@ import { WorkspaceChatPane } from './WorkspaceChatPane';
 import { WorkspaceClassroomPane } from './WorkspaceClassroomPane';
 import { PaneTab } from './PaneTab';
 import { ResizeHandle } from './ResizeHandle';
+import { announceLaunchedCourse } from '@/lib/workbench/launch-return';
 
 const EMPTY_SESSIONS: ProHomeSessionItem[] = [];
 
@@ -709,6 +710,15 @@ function WorkspaceShellController({ initialPanes }: { readonly initialPanes: Wor
   const attachedSessionReplaying = useWorkbenchStore((s) => s.replaying);
   const replayedStageLinkCount = useWorkbenchStore((s) => s.replayedStageLinkCount);
   const pageCount = useWorkbenchStore((s) => Object.keys(s.pages).length);
+  // Fork: once the agent has made the course, send its page link to the app that
+  // launched this lesson (ALEX+), if any. A no-op for ordinary sessions. Uses the course
+  // links the agent posts, not the session's `stageId`: that is a placeholder
+  // (`stage-<session id>`) set when the session is created, while the agent's
+  // create_stage makes the real course under its own id.
+  const launchSessionId = useWorkbenchStore((s) => s.sessionId);
+  useEffect(() => {
+    announceLaunchedCourse(launchSessionId, stageLinkStageIds[0] ?? null);
+  }, [launchSessionId, stageLinkStageIds]);
   const paneSessionStageId = useMemo(
     () => sessions.find((session) => session.id === panes.sessionId)?.stageId ?? null,
     [panes.sessionId, sessions],

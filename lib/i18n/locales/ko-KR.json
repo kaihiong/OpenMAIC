@@ -14,7 +14,7 @@
     "greetingWithName": "안녕하세요, {{name}}!",
     "welcome": {
       "title": "OpenMAIC에 오신 것을 환영합니다! 만나서 반가워요.",
-      "environment": "이 버전은 NIE 환경에서 운영됩니다. 모두의 안전을 위해 Confidential(기밀) 등급 이하의 자료만 업로드하고, 개인 정보는 포함하지 마세요.",
+      "environment": "이 사이트는 NIE 환경에서 운영되는 테스트 및 평가용 개념 증명(Proof of Concept) 사이트입니다. 모두의 안전을 위해 Confidential(기밀) 등급 이하의 자료만 업로드하고, 개인 정보는 포함하지 마세요.",
       "supportPrefix": "문제가 있나요? 언제든",
       "supportSuffix": "로 연락해 주세요.",
       "proPrompt": "AI 어시스턴트와 함께 강의를 한 단계씩 만들고 다듬고 싶나요?",

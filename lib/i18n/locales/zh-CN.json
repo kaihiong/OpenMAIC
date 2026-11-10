@@ -14,7 +14,7 @@
     "greetingWithName": "嗨，{{name}}",
     "welcome": {
       "title": "欢迎使用 OpenMAIC！很高兴见到你。",
-      "environment": "此版本运行在 NIE 环境中。为了保障大家的安全，请只上传密级为“机密”（Confidential）或以下的资料，并且不要上传任何个人资料。",
+      "environment": "这是一个运行在 NIE 环境中、用于测试和评估的概念验证（Proof of Concept）网站。为了保障大家的安全，请只上传密级为“机密”（Confidential）或以下的资料，并且不要上传任何个人资料。",
       "supportPrefix": "遇到问题？欢迎发邮件至",
       "supportSuffix": "。",
       "proPrompt": "想在 AI 助手的协助下一步步构建和完善课程吗？",

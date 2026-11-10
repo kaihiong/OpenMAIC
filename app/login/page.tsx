@@ -134,7 +134,7 @@ export default function LoginPage() {
         body: JSON.stringify({ userid: username, pd: password }),
       });
       if (res.ok) {
-        router.push('/');
+        router.push(safeNextPath());
       } else {
         const data = await res.json();
         setError(data.error ?? 'Login failed. Please check your credentials.');
@@ -286,6 +286,23 @@ export default function LoginPage() {
       `}</style>
     </div>
   );
+}
+
+/**
+ * Fork: where to go after signing in. The middleware sends signed-out visitors here with
+ * `?next=<path+query>` so a launch link (e.g. ALEX+'s /workbench/new?prompt=…) survives the
+ * login. Only same-site paths are accepted, so the parameter cannot redirect off-site.
+ */
+function safeNextPath(): string {
+  try {
+    const next = new URLSearchParams(window.location.search).get('next');
+    if (next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\')) {
+      return next;
+    }
+  } catch {
+    // Fall through to the home page.
+  }
+  return '/';
 }
 
 function ArrowIcon() {

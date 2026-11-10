@@ -14,7 +14,7 @@
     "greetingWithName": "Hi, {{name}}",
     "welcome": {
       "title": "Welcome to OpenMAIC! We're glad you're here.",
-      "environment": "This version runs within the NIE environment. To keep everyone safe, please only upload materials classified Confidential or below, and leave out any personal data.",
+      "environment": "This Proof of Concept site runs within the NIE environment for testing and evaluation. To keep everyone safe, please only upload materials classified Confidential or below, and leave out any personal data.",
       "supportPrefix": "Something not working? Just drop us a note at",
       "supportSuffix": ".",
       "proPrompt": "Want to build and refine a course step by step with an AI assistant?",

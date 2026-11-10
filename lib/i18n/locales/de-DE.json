@@ -14,7 +14,7 @@
     "greetingWithName": "Hallo, {{name}}",
     "welcome": {
       "title": "Willkommen bei OpenMAIC! Schön, dass du da bist.",
-      "environment": "Diese Version läuft in der NIE-Umgebung. Damit alle geschützt bleiben, lade bitte nur Materialien hoch, die höchstens als „Confidential“ (vertraulich) eingestuft sind, und keine personenbezogenen Daten.",
+      "environment": "Diese Proof-of-Concept-Website für Tests und Evaluation läuft in der NIE-Umgebung. Damit alle geschützt bleiben, lade bitte nur Materialien hoch, die höchstens als „Confidential“ (vertraulich) eingestuft sind, und keine personenbezogenen Daten.",
       "supportPrefix": "Funktioniert etwas nicht? Schreib uns einfach an",
       "supportSuffix": ".",
       "proPrompt": "Möchtest du einen Kurs Schritt für Schritt mit einem KI-Assistenten aufbauen und verfeinern?",

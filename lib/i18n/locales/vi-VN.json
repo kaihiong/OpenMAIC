@@ -14,7 +14,7 @@
     "greetingWithName": "Chào {{name}}",
     "welcome": {
       "title": "Chào mừng bạn đến với OpenMAIC! Rất vui được gặp bạn.",
-      "environment": "Phiên bản này chạy trong môi trường của NIE. Để giữ an toàn cho mọi người, vui lòng chỉ tải lên tài liệu được phân loại “Confidential” (mật) trở xuống và không tải lên dữ liệu cá nhân.",
+      "environment": "Đây là trang thử nghiệm khái niệm (Proof of Concept) chạy trong môi trường của NIE, dùng để kiểm thử và đánh giá. Để giữ an toàn cho mọi người, vui lòng chỉ tải lên tài liệu được phân loại “Confidential” (mật) trở xuống và không tải lên dữ liệu cá nhân.",
       "supportPrefix": "Có gì trục trặc? Cứ gửi email cho chúng tôi tại",
       "supportSuffix": ".",
       "proPrompt": "Bạn muốn xây dựng và hoàn thiện khóa học từng bước cùng trợ lý AI?",

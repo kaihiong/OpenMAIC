@@ -17,6 +17,7 @@ import {
 } from '@/lib/workbench/session-store';
 import type { CourseRef } from '@/lib/workbench/course-refs';
 import { workspaceHref } from '@/lib/workbench/workspace-panes';
+import { announceLaunchedSession } from '@/lib/workbench/launch-return';
 import { useI18n } from '@/lib/hooks/use-i18n';
 
 // Older deployed home composers may still write this key during a rolling deploy.
@@ -84,6 +85,12 @@ export function WorkbenchLaunchBridge() {
         if (session.courseRefsAccepted === false) {
           toast.warning(t('workspace.courseMention.notAccepted'));
         }
+        // Fork: hand the link back to the app that launched this lesson (ALEX+).
+        void announceLaunchedSession(
+          session.id,
+          searchParams.get('returnOrigin'),
+          searchParams.get('launch'),
+        );
         try {
           window.sessionStorage.removeItem(LEGACY_LAUNCH_HANDOFF_KEY);
         } catch {
@@ -105,7 +112,7 @@ export function WorkbenchLaunchBridge() {
         }
         setError(cause instanceof Error ? cause.message : t('workbench.launch.createFailed'));
       });
-  }, [attempt, intent, router, skill, t]);
+  }, [attempt, intent, router, searchParams, skill, t]);
 
   if (error) {
     return (
