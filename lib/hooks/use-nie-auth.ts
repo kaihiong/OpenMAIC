@@ -7,6 +7,8 @@ interface NieUser {
   name: string;
   email: string;
   department: string;
+  /** Fork: server-decided; admin routes re-check it. */
+  isAdmin: boolean;
 }
 
 export function useNieAuth() {
@@ -24,7 +26,16 @@ export function useNieAuth() {
           return fetch('/api/auth/me')
             .then((r) => (r.ok ? r.json() : null))
             .then((d) =>
-              setUser(d ? { name: d.name, email: d.email, department: d.department } : null),
+              setUser(
+                d
+                  ? {
+                      name: d.name,
+                      email: d.email,
+                      department: d.department,
+                      isAdmin: d.isAdmin === true,
+                    }
+                  : null,
+              ),
             )
             .catch(() => {});
         }

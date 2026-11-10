@@ -27,16 +27,32 @@ export function isBrowserPersistenceEnabled(): boolean {
   return typeof window !== 'undefined' && process.env.NEXT_PUBLIC_PERSISTENCE === '1';
 }
 
+/**
+ * Fork: with NIE login the server derives the runtime partition from the
+ * session (`nie:<userId>`) and refuses any other, so use the key it reports.
+ * Without a signed-in NIE session, fall back to the device key.
+ */
+async function signedInLearnerKey(): Promise<string | undefined> {
+  try {
+    const res = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
+    if (!res.ok) return undefined;
+    const body = (await res.json()) as { learnerKey?: unknown };
+    return typeof body.learnerKey === 'string' && body.learnerKey ? body.learnerKey : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function getPersistenceLearnerKey(): Promise<string> {
   if (!isBrowserPersistenceEnabled()) {
     return Promise.reject(new Error('Browser persistence is not enabled'));
   }
-  return (learnerKeyPromise ??= getLearnerKey((deviceKv ??= new BrowserKVStore())).catch(
-    (error) => {
+  return (learnerKeyPromise ??= signedInLearnerKey()
+    .then((key) => key ?? getLearnerKey((deviceKv ??= new BrowserKVStore())))
+    .catch((error) => {
       learnerKeyPromise = undefined;
       throw error;
-    },
-  ));
+    }));
 }
 
 export async function getPersistenceRequestHeaders(): Promise<Record<string, string>> {

@@ -1,4 +1,5 @@
 import type { TTSProviderId } from '@/lib/audio/types';
+import { isVoiceSupportedByTTSModel } from '@/lib/audio/legacy-tts-voices';
 import { isCustomTTSProvider } from '@/lib/audio/types';
 import type { AgentConfig } from '@/lib/orchestration/registry/types';
 import {
@@ -256,6 +257,8 @@ export function getEnabledProvidersWithVoices(
       modelId?: string;
       providerOptions?: Record<string, unknown>;
       customName?: string;
+      serverModels?: string[];
+      serverDisplayName?: string;
     }
   >,
   voiceProfiles: UserVoiceProfile[] = [],
@@ -295,6 +298,25 @@ export function getEnabledProvidersWithVoices(
             name: profile.name,
             language: 'auto',
           }));
+
+    // Fork: a server-pinned model list replaces the catalogue's, and only
+    // voices the pinned model accepts are offered (e.g. Azure `tts-hd`).
+    const serverModels = providerConfig?.serverModels?.filter(Boolean) ?? [];
+    if (serverModels.length > 0) {
+      const pinnedVoices = config.voices
+        .filter((v) => isVoiceSupportedByTTSModel(serverModels[0], v.id))
+        .filter((v) => !v.compatibleModels || v.compatibleModels.includes(serverModels[0]))
+        .map((v) => ({ id: v.id, name: v.name, language: v.language }));
+      result.push({
+        providerId,
+        providerName: providerConfig?.serverDisplayName || config.name,
+        voices: pinnedVoices,
+        modelGroups: [
+          { modelId: serverModels[0], modelName: serverModels[0], voices: pinnedVoices },
+        ],
+      });
+      continue;
+    }
 
     {
       const allVoices = [

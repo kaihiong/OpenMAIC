@@ -1,4 +1,5 @@
 import { promises as fs } from 'fs';
+import { newCourseId } from '@/lib/utils/course-id';
 import path from 'path';
 import { nanoid } from 'nanoid';
 import type { NextRequest } from 'next/server';
@@ -28,13 +29,14 @@ export const CLASSROOM_ID_LENGTH = 10;
 export const CLASSROOM_ID_MAX_ATTEMPTS = 3;
 
 /**
- * Generate a classroom id. Uses the same shape as the generation pipeline
- * (nanoid, 10 URL-safe characters) so both creation paths draw from one
- * alphabet and length, and every generated id satisfies
- * `isValidClassroomId`.
+ * Generate a classroom id. Fork: a UUID, the same shape the generation
+ * pipeline now mints (lib/utils/course-id.ts), so both creation paths draw from
+ * one namespace and every generated id satisfies `isValidClassroomId`. Older
+ * 10-character ids stay valid.
  */
 export function generateClassroomId(): string {
-  return nanoid(CLASSROOM_ID_LENGTH);
+  // Fork: course ids are UUIDs (lib/utils/course-id.ts).
+  return newCourseId();
 }
 
 /**

@@ -11,7 +11,18 @@
   },
   "home": {
     "slogan": "멀티 에이전트 인터랙티브 교실에서 펼치는 생성형 학습",
-    "greetingWithName": "안녕하세요, {{name}}!"
+    "greetingWithName": "안녕하세요, {{name}}!",
+    "welcome": {
+      "title": "OpenMAIC에 오신 것을 환영합니다! 만나서 반가워요.",
+      "environment": "이 버전은 NIE 환경에서 운영됩니다. 모두의 안전을 위해 Confidential(기밀) 등급 이하의 자료만 업로드하고, 개인 정보는 포함하지 마세요.",
+      "supportPrefix": "문제가 있나요? 언제든",
+      "supportSuffix": "로 연락해 주세요.",
+      "proPrompt": "AI 어시스턴트와 함께 강의를 한 단계씩 만들고 다듬고 싶나요?",
+      "enterPro": "프로 모드로 들어가기",
+      "classicPrompt": "수업 전체를 한 번에 만들고 싶나요?",
+      "backToClassic": "클래식 모드로 돌아가기",
+      "signOff": "즐거운 가르침과 배움이 되길 바랍니다!"
+    }
   },
   "toolbar": {
     "pdfParser": "파서",
@@ -1759,7 +1770,7 @@
     "selectAgents": "에이전트 선택",
     "noVisionWarning": "현재 모델은 비전을 지원하지 않습니다. 슬라이드에 이미지를 삽입할 수 있지만, 모델이 이미지 내용을 이해하여 선택 및 레이아웃을 최적화할 수 없습니다",
     "serverConfigured": "서버",
-    "serverConfiguredNotice": "이 제공업체는 서버에서 관리되므로 여기서 편집할 수 없습니다. 본인 자격 증명을 사용하려면 별도의 제공업체를 추가하세요.",
+    "serverConfiguredNotice": "이 제공업체는 서버에서 관리되므로 여기서 편집할 수 없습니다.",
     "ttsProviderEnabledLabel": "이 제공업체 활성화",
     "ttsProviderEnabledHint": "비활성화하면 이 제공업체가 음성 선택기에서 숨겨지고 자동으로 지정되지 않습니다.",
     "ttsProviderUnavailableHint": "활성화하기 전에 이 제공업체를 설정하세요.",

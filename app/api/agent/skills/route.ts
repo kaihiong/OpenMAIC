@@ -1,7 +1,7 @@
 /**
  * Agent runtime control plane — the installed skills.
  *
- *   GET /api/agent/skills -> [{ id, name, title, description, hasConstraints, source }]
+ *   GET /api/agent/skills -> [{ id, name, title, description, hasConstraints, source, publisher? }]
  *
  * Drives the `/` picker (a skill the user names there becomes the session's
  * user-locked skill at creation). `title` is the skill's display name from its
@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
         description: s.description,
         hasConstraints: !!s.constraints,
         source: s.source,
+        ...(s.publisher ? { publisher: s.publisher } : {}),
       })),
       { headers: responseHeaders },
     );

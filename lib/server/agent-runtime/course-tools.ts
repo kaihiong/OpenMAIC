@@ -95,6 +95,8 @@ export interface CourseToolDeps {
   synthesizeTts?: (input: SceneTtsInput) => Promise<SceneTtsSummary>;
   /** Resolve the skill that owns structural diagnostics for the current turn. */
   getActiveSkill?: () => LoadedSkill | null;
+  /** Fork: build guidance for interactive pages from the skill in use, if any. */
+  getWidgetCraft?: () => string | undefined;
 }
 
 /**

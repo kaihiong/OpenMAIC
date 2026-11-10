@@ -1,5 +1,6 @@
 'use client';
 
+import { newCourseId } from '@/lib/utils/course-id';
 import { useEffect, useState, Suspense, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
@@ -531,7 +532,7 @@ function GenerationPreviewContent() {
       }
 
       // Create stage client-side
-      const stageId = nanoid(10);
+      const stageId = newCourseId();
       const stage: Stage = {
         id: stageId,
         name: extractTopicFromRequirement(currentSession.requirements.requirement),

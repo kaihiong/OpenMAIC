@@ -420,9 +420,6 @@ export function patchHtmlForIframe(html: string): string {
   /* Fix min-h-screen: in iframes 100vh is the iframe height, which is correct,
      but ensure body actually fills it */
   body { min-height: 100vh; }
-  /* Light theme page background is white. Out-specifies the page's own :root token,
-     so pages generated with the older grey --bg follow it too. */
-  :root:not([data-theme="dark"]) { --bg: #FFFFFF; }
 </style>`;
 
   const injection =

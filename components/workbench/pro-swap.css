@@ -155,10 +155,37 @@ html[data-pro-swap] [data-pro-morph='composer'] {
   view-transition-name: pro-composer;
 }
 
-html[data-pro-swap]::view-transition-group(root),
-html[data-pro-swap]::view-transition-group(pro-lockup),
-html[data-pro-swap]::view-transition-group(pro-badge) {
+/* Fork: the NIE welcome card is one card on both surfaces with a different
+   button on each face, so it turns over exactly like the composer does. */
+html[data-pro-swap] [data-pro-morph='notice'] {
+  view-transition-name: pro-notice;
+}
+
+html[data-pro-swap]::view-transition-group(root) {
   animation: pro-swap-anchor-hold 210ms linear both;
+}
+
+/* Fork: the logo, its Pro badge and the tagline glide between their two
+   positions (the Pro page sets them lower) instead of jumping, timed with the
+   card flips. Timing longhands only, so the UA's position/size interpolation
+   on the group is what moves them. */
+html[data-pro-swap] [data-pro-morph='tagline'] {
+  view-transition-name: pro-tagline;
+}
+
+html[data-pro-swap]::view-transition-group(pro-lockup),
+html[data-pro-swap]::view-transition-group(pro-badge),
+html[data-pro-swap]::view-transition-group(pro-tagline) {
+  animation-duration: 520ms;
+  animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* Same words on both pages at slightly different sizes: crossfade the two
+   snapshots across the glide so the size change never shows as a jump. */
+html[data-pro-swap]::view-transition-old(pro-tagline),
+html[data-pro-swap]::view-transition-new(pro-tagline) {
+  animation-duration: 520ms;
+  animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 html[data-pro-swap]::view-transition-old(root) {
@@ -202,7 +229,8 @@ html[data-pro-swap='exit']::view-transition-new(pro-badge) {
    hinge. Above the dissolving surface by pseudo-tree order already, since root
    is always the first group; stated anyway, because "it happens to paint last"
    is not a thing to leave a flip depending on. */
-html[data-pro-swap]::view-transition-group(pro-composer) {
+html[data-pro-swap]::view-transition-group(pro-composer),
+html[data-pro-swap]::view-transition-group(pro-notice) {
   animation-duration: 520ms;
   animation-timing-function: cubic-bezier(0.86, 0, 0.14, 1);
   z-index: 2;
@@ -214,25 +242,64 @@ html[data-pro-swap]::view-transition-group(pro-composer) {
    plus-lighter, a translucent card over a dissolving surface brightens at the
    seam instead of staying its own colour. */
 html[data-pro-swap]::view-transition-old(pro-composer),
-html[data-pro-swap]::view-transition-new(pro-composer) {
+html[data-pro-swap]::view-transition-new(pro-composer),
+html[data-pro-swap]::view-transition-old(pro-notice),
+html[data-pro-swap]::view-transition-new(pro-notice) {
   mix-blend-mode: normal;
   transform-origin: center;
 }
 
-html[data-pro-swap='enter']::view-transition-old(pro-composer) {
+html[data-pro-swap='enter']::view-transition-old(pro-composer),
+html[data-pro-swap='enter']::view-transition-old(pro-notice) {
   animation: pro-composer-turn-out-forward 240ms cubic-bezier(0.4, 0, 1, 1) both;
 }
 
-html[data-pro-swap='enter']::view-transition-new(pro-composer) {
+html[data-pro-swap='enter']::view-transition-new(pro-composer),
+html[data-pro-swap='enter']::view-transition-new(pro-notice) {
   animation: pro-composer-turn-in-forward 280ms cubic-bezier(0.22, 1, 0.36, 1) 240ms both;
 }
 
-html[data-pro-swap='exit']::view-transition-old(pro-composer) {
+html[data-pro-swap='exit']::view-transition-old(pro-composer),
+html[data-pro-swap='exit']::view-transition-old(pro-notice) {
   animation: pro-composer-turn-out-back 240ms cubic-bezier(0.4, 0, 1, 1) both;
 }
 
-html[data-pro-swap='exit']::view-transition-new(pro-composer) {
+html[data-pro-swap='exit']::view-transition-new(pro-composer),
+html[data-pro-swap='exit']::view-transition-new(pro-notice) {
   animation: pro-composer-turn-in-back 280ms cubic-bezier(0.22, 1, 0.36, 1) 240ms both;
+}
+
+/* Fork: the Pro sidebar exists on one side of the swap only, so it has no
+   partner to morph into: it slides in from the left on the way into Pro and
+   back out on the way to classic, above the dissolving page. */
+@keyframes pro-rail-in {
+  from {
+    opacity: 0.4;
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes pro-rail-out {
+  to {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+}
+
+html[data-pro-swap] [data-pro-morph='rail'] {
+  view-transition-name: pro-rail;
+}
+
+html[data-pro-swap]::view-transition-group(pro-rail) {
+  z-index: 1;
+}
+
+html[data-pro-swap='enter']::view-transition-new(pro-rail) {
+  animation: pro-rail-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html[data-pro-swap='exit']::view-transition-old(pro-rail) {
+  animation: pro-rail-out 320ms cubic-bezier(0.4, 0, 1, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -251,16 +318,27 @@ html[data-pro-swap='exit']::view-transition-new(pro-composer) {
      hide the leaving one, the way the lockup is handled. `animation: none` on
      the group drops the UA geometry interpolation too, so the card is simply
      already the size it is going to be. */
-  html[data-pro-swap]::view-transition-group(pro-composer) {
+  html[data-pro-swap='enter']::view-transition-new(pro-rail),
+  html[data-pro-swap='exit']::view-transition-old(pro-rail) {
     animation: none;
   }
 
-  html[data-pro-swap]::view-transition-old(pro-composer) {
+  html[data-pro-swap]::view-transition-group(pro-composer),
+  html[data-pro-swap]::view-transition-group(pro-notice),
+  html[data-pro-swap]::view-transition-group(pro-lockup),
+  html[data-pro-swap]::view-transition-group(pro-badge),
+  html[data-pro-swap]::view-transition-group(pro-tagline) {
+    animation: none;
+  }
+
+  html[data-pro-swap]::view-transition-old(pro-composer),
+  html[data-pro-swap]::view-transition-old(pro-notice) {
     animation: none;
     opacity: 0;
   }
 
-  html[data-pro-swap]::view-transition-new(pro-composer) {
+  html[data-pro-swap]::view-transition-new(pro-composer),
+  html[data-pro-swap]::view-transition-new(pro-notice) {
     animation: none;
     opacity: 1;
     transform: none;

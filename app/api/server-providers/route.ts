@@ -7,6 +7,7 @@ import {
   getServerVideoProviders,
   getServerWebSearchProviders,
   getParallelSceneConcurrency,
+  isServerProvidersOnly,
 } from '@/lib/server/provider-config';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
 import { createLogger } from '@/lib/logger';
@@ -17,6 +18,7 @@ export async function GET() {
   try {
     return apiSuccess({
       providers: getServerProviders(),
+      serverProvidersOnly: isServerProvidersOnly(),
       tts: getServerTTSProviders(),
       asr: getServerASRProviders(),
       pdf: getServerPDFProviders(),

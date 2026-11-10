@@ -78,4 +78,15 @@ describe('resolveImageSize', () => {
     process.env.IMAGE_MIN_PIXELS = '3686400';
     expect(resolveImageSize(options({}))).toMatchObject({ width: 1920, height: 1920 });
   });
+
+  // Fork: Azure OpenAI serves the same GPT Image models with the same limits.
+  it('normalizes Azure OpenAI GPT Image 2.5 requests to a supported size', async () => {
+    const { resolveImageSize } = await import('@/lib/server/image-sizing');
+    expect(
+      resolveImageSize(
+        { prompt: 'p', aspectRatio: '16:9' },
+        { providerId: 'azure-openai-image', modelId: 'gpt-image-2.5-flare' },
+      ),
+    ).toMatchObject({ width: 1536, height: 1024 });
+  });
 });

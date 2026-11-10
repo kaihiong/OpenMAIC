@@ -1,14 +1,16 @@
-## Design System: Apple Style (applies to the whole page)
+### NIE Design: NIE-branded design system (applies to the whole page)
 
-Build the page so it looks like it belongs on apple.com or in a first-party iOS/macOS app:
-calm, content-first, one accent colour, precise typography, soft depth.
+Build the page so it is recognisably NIE (National Institute of Education, Singapore): confident
+and clear, built on the NIE institutional colours — NIE blue `#0047B6`, NIE red `#D81F2A` and NIE
+yellow `#FFB300` — with a branded title band, white cards on a cool grey page, precise typography
+and soft depth. It should feel like a polished NIE teaching tool, not a plain form.
 This section governs **look, layout and libraries**. Every functional rule in this prompt
 (required element IDs, widget config, postMessage listener, reset, overlap safety, 3D lighting)
 still wins if anything here seems to conflict. The stage-format and theme rules below replace any
 mobile-first sizing advice or fixed example colours (`#3498db`, `bg-white`, dark-only palettes …)
-that appear later in this prompt.
+that appear earlier in this prompt.
 
-### Stage format: one 1280×720 screen, no page scroll (CRITICAL)
+#### Stage format: one 1280×720 screen, no page scroll (CRITICAL)
 
 The page is shown inside a lesson stage as a fixed **1280×720** viewport, scaled to fit the
 learner's screen. It is a screen in an app (think a Keynote slide or an iPad app window), **not
@@ -41,7 +43,7 @@ a long web page** — the learner must see the whole activity at once without sc
 - Keep descriptive text to a line or two per control; no paragraphs of explanation on screen.
 - Responsive Tailwind prefixes are fine but optional: the viewport is always 1280×720 (`xl`).
 
-### Required `<head>` resources (load from CDN, exact versions)
+#### Required `<head>` resources (load from CDN, exact versions)
 
 ```html
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -52,7 +54,7 @@ a long web page** — the learner must see the whole activity at once without sc
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 ```
 
-### CDN rules
+#### CDN rules
 
 - Prefer a well-known CDN library over hand-written code whenever one fits:
   Chart.js (`https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js`),
@@ -64,7 +66,7 @@ a long web page** — the learner must see the whole activity at once without sc
 - No build step, no npm imports, no bare-specifier ES module imports without an import map.
 - Do not load a library you do not use.
 
-### Tailwind usage
+#### Tailwind usage
 
 - Style elements with Tailwind utility classes directly in markup (`flex`, `gap-4`, `rounded-2xl`,
   `text-[17px]`, `md:grid-cols-2` ...). Responsive prefixes are encouraged.
@@ -73,7 +75,7 @@ a long web page** — the learner must see the whole activity at once without sc
   `backdrop-filter`, canvas sizing) in one ordinary `<style>` block using the CSS variables below,
   and reference them from utilities with arbitrary values, e.g. `bg-[var(--surface)]`.
 
-### Colour tokens and light/dark theme (CRITICAL)
+#### Colour tokens and light/dark theme (CRITICAL)
 
 The host app sets `<html data-theme="light">` or `<html data-theme="dark">` to match the
 learner's theme setting, and may switch it **while the page is open**. Every page must support
@@ -82,36 +84,46 @@ canvas drawing:
 
 ```css
 :root {
-  --bg: #FFFFFF;          /* page background */
+  --bg: #F3F6FB;          /* page background: cool grey, so white cards stand out */
   --surface: #FFFFFF;     /* cards, panels */
-  --surface-2: #F2F2F7;   /* inset wells, list rows, segmented-control track */
-  --label: #1D1D1F;       /* primary text */
-  --label-2: #6E6E73;     /* secondary text */
-  --separator: rgba(60, 60, 67, 0.18);
-  --track: #D1D1D6;       /* slider/progress track, chart gridlines */
-  --accent: #0071E3;      /* the ONE accent: primary buttons, active states, links */
-  --accent-soft: rgba(0, 113, 227, 0.10);
+  --surface-2: #E9EFF8;   /* inset wells, list rows, segmented-control track */
+  --label: #0E1A2B;       /* primary text */
+  --label-2: #4A5A70;     /* secondary text */
+  --separator: rgba(14, 26, 43, 0.12);
+  --track: #C9D3E3;       /* slider/progress track, chart gridlines */
+  --accent: #0047B6;      /* NIE blue: primary buttons, active states, links, series 1 */
+  --accent-soft: rgba(0, 71, 182, 0.10);
   --on-accent: #FFFFFF;
-  --glass: rgba(255, 255, 255, 0.72);
-  --green: #34C759; --orange: #FF9500; --red: #FF3B30; --purple: #AF52DE; --teal: #30B0C7;
-  --radius-lg: 22px; --radius-md: 14px;
-  --shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --brand-red: #D81F2A;   /* NIE red: emphasis, highlights, series 2 (NOT errors) */
+  --brand-yellow: #FFB300;/* NIE yellow: decorative only (rules, markers); never text on white */
+  --hero-bg: #FFFFFF;     /* the title band: white, simple and easy to read */
+  --hero-label: #0E1A2B;
+  --hero-eyebrow: #0047B6;
+  --success: #1E7F3C; --warning: #9A5B00; --danger: #B3261E;
+  --glass: rgba(255, 255, 255, 0.78);
+  --radius-lg: 18px; --radius-md: 12px;
+  --shadow: 0 6px 24px rgba(14, 26, 43, 0.08), 0 1px 2px rgba(14, 26, 43, 0.06);
   color-scheme: light;
 }
 :root[data-theme="dark"] {
-  --bg: #000000;
-  --surface: #1C1C1E;
-  --surface-2: #2C2C2E;
-  --label: #F5F5F7;
-  --label-2: #98989D;
-  --separator: rgba(84, 84, 88, 0.6);
-  --track: #3A3A3C;
-  --accent: #2997FF;
-  --accent-soft: rgba(41, 151, 255, 0.18);
-  --on-accent: #FFFFFF;
-  --glass: rgba(28, 28, 30, 0.72);
-  --green: #30D158; --orange: #FF9F0A; --red: #FF453A; --purple: #BF5AF2; --teal: #40C8E0;
-  --shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --bg: #0A1220;
+  --surface: #121C2E;
+  --surface-2: #1B2840;
+  --label: #EEF3FB;
+  --label-2: #A9B6C9;
+  --separator: rgba(238, 243, 251, 0.14);
+  --track: #33425C;
+  --accent: #3383FF;      /* NIE blue stepped up for dark; dark text on it */
+  --accent-soft: rgba(51, 131, 255, 0.18);
+  --on-accent: #08101E;
+  --brand-red: #FF5C64;
+  --brand-yellow: #FFC233;
+  --hero-bg: #121C2E;
+  --hero-label: #EEF3FB;
+  --hero-eyebrow: #3383FF;
+  --success: #4CC27A; --warning: #F2A93B; --danger: #FF6B6B;
+  --glass: rgba(18, 28, 46, 0.78);
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.3);
   color-scheme: dark;
 }
 body { background: var(--bg); color: var(--label); }
@@ -135,15 +147,61 @@ window.addEventListener('maic-themechange', function () {
 
 - 3D scenes that need a dark backdrop (space, deep sea) may keep a dark scene background in both
   themes, but their panels, text and controls still follow the tokens.
-- One colour means one thing. `--accent` is for interaction; green/orange/red are for
-  status (correct / caution / wrong) and data series only. Never convey meaning by colour alone —
-  pair it with an icon or text.
+- One colour means one thing. `--accent` (NIE blue) is for interaction and the first data series;
+  `--brand-red` is for emphasis and the second data series; `--brand-yellow` is decorative only.
+  Status uses `--success` / `--warning` / `--danger`, never the brand red. Never convey meaning
+  by colour alone — pair it with an icon or text.
+- Use at most three data colours on one visual: `--accent`, `--brand-red`, then `--label-2`.
 - No rainbow gradients, neon glows, heavy drop shadows, or thick coloured borders.
-  At most one subtle gradient, used once, on a hero/title element.
 
-### Typography
+#### NIE brand signature (REQUIRED)
 
-- `font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", Arial, sans-serif;`
+- The page header is a **title band** built with exactly this markup and CSS (copy it; change
+  only the text). The band is white (a dark surface in dark mode) with a blue, red and yellow
+  strip in equal thirds along its bottom edge, INSIDE the band and clipped by its rounded corners.
+  Never draw the strip as a separate element below the band.
+
+```html
+<header class="nie-band shrink-0">
+  <p class="nie-eyebrow">Biology · Secondary 3</p>
+  <h1 class="nie-title">Limiting Factors of Photosynthesis</h1>
+  <!-- optional: <p class="nie-subtitle">One short line.</p> -->
+  <!-- optional header controls (e.g. Focus) go in <div class="nie-band-actions">…</div> -->
+</header>
+```
+
+```css
+.nie-band {
+  position: relative; overflow: hidden;            /* clips the strip to the rounded corners */
+  border-radius: var(--radius-lg);
+  background: var(--hero-bg); color: var(--hero-label); box-shadow: var(--shadow);
+  padding: 18px 28px 22px;                         /* bottom padding clears the 6px strip */
+}
+.nie-band::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px;
+  background: linear-gradient(to right, var(--accent) 0 33.34%, var(--brand-red) 33.34% 66.67%,
+    var(--brand-yellow) 66.67% 100%);
+}
+.nie-eyebrow { margin: 0 0 4px; font-size: 12.5px; font-weight: 600; letter-spacing: .08em;
+               text-transform: uppercase; color: var(--hero-eyebrow); }
+.nie-title { margin: 0; font-size: 30px; line-height: 1.15; font-weight: 700;
+             letter-spacing: -0.02em; color: var(--hero-label); }
+.nie-subtitle { margin: 4px 0 0; font-size: 15px; color: var(--hero-label); opacity: .85; }
+.nie-band-actions { position: absolute; top: 50%; right: 24px; transform: translateY(-50%);
+                    display: flex; gap: 8px; }
+.nie-band-actions button { background: var(--accent-soft); color: var(--accent);
+                           border-radius: 999px; }
+```
+
+- That strip is the page's one decorative gradient. Do not add other tricolour lines, and do not
+  put a border, outline or separate rule under the band.
+- The title band counts toward the ~90px header budget; keep it compact.
+- Cards are white (`--surface`) on the grey page (`--bg`) with `--shadow`; the main visual's
+  card may use a faint `--accent-soft` wash behind the drawing to frame it.
+
+#### Typography
+
+- `font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;`
   with `-webkit-font-smoothing: antialiased`.
 - Scale (sized for the 1280×720 stage): page title 28–32px semibold, letter-spacing -0.02em
   (one per page); card title 17–20px semibold; body 15–17px regular; caption 13px (never below
@@ -153,7 +211,7 @@ window.addEventListener('maic-themechange', function () {
   same sans-serif font. Wherever this prompt asks for a "monospace font for numbers", satisfy it
   this way — a typewriter monospace face is reserved for code only.
 
-### Layout and surfaces
+#### Layout and surfaces
 
 - Spacing follows an 8px grid: 16–24px between groups, 12–16px inside them. Restraint comes from
   few elements and clear alignment, not from empty space that pushes content off the stage.
@@ -165,17 +223,17 @@ window.addEventListener('maic-themechange', function () {
 - One signature element per page (the simulation canvas, the diagram, the game board) gets the
   space and the boldness; everything around it stays quiet.
 
-### Controls (iOS / macOS feel)
+#### Controls
 
 - Minimum touch target 44×44px. Visible `:focus-visible` ring: `outline: 3px solid var(--accent-soft); outline-offset: 2px`.
 - Primary button: pill (`rounded-full`), `--accent` fill, `--on-accent` 15–17px semibold text, height 44px,
   pressed state `active:scale-[0.97]`. Only one primary button per group.
-- Secondary button: pill, `--accent-soft` fill, `--accent` text. Destructive: `--red` text.
+- Secondary button: pill, `--accent-soft` fill, `--accent` text. Destructive: `--danger` text.
 - Mode switches use a segmented control (pill track in `--surface-2`, `--surface` sliding thumb with shadow).
-- On/off settings use an iOS-style switch (51×31px track, `--green` when on).
+- On/off settings use an iOS-style switch (51×31px track, `--accent` when on).
 - Range sliders: show the live value beside the label in `--label-2`, tabular numerals, with its
-  unit. Style every `input[type="range"]` with **exactly** this CSS (iOS look: thin track, accent
-  fill up to the thumb, white thumb). Do not use `accent-color` and do not omit `appearance: none`
+  unit. Style every `input[type="range"]` with **exactly** this CSS (thin track, accent fill up to
+  the thumb, white thumb). Do not use `accent-color` and do not omit `appearance: none`
   on the input itself — otherwise the browser draws its native slider on top and the track doubles.
 
 ```css
@@ -225,7 +283,7 @@ document.querySelectorAll('input[type="range"]').forEach(function (el) {
 - Labels read as actions in Title Case on buttons ("Start Simulation", "Reset", "Check Answer");
   an action keeps its name through the flow.
 
-### Icons (Font Awesome 6)
+#### Icons (Font Awesome 6)
 
 - Use Font Awesome for every icon: `<i class="fa-solid fa-play" aria-hidden="true"></i>`.
   Do not use emoji as UI icons.
@@ -239,17 +297,18 @@ document.querySelectorAll('input[type="range"]').forEach(function (el) {
   settings `fa-sliders`, expand `fa-up-right-and-down-left-from-center`, zoom `fa-magnifying-glass-plus` / `fa-magnifying-glass-minus`.
 - An icon-only button must carry `aria-label` text.
 
-### Motion
+#### Motion
 
 - UI transitions are brief and soft: 200–350ms, `cubic-bezier(0.25, 0.1, 0.25, 1)`;
   cards fade/slide in 8–12px. No bouncing or spinning decorations.
 - Wrap decorative UI motion in `@media (prefers-reduced-motion: no-preference)`. The core
   simulation/game animation is content, not decoration — it must still run.
 
-### Quality bar
+#### Quality bar
 
 - Text contrast at least 4.5:1 (3:1 for 18px+ or bold). `--label-2` on `--surface` passes; never
   put `--label-2` text on `--surface-2` below 15px.
 - The whole activity fits the 1280×720 frame with no page scroll, and reads correctly in both
   `data-theme="light"` and `data-theme="dark"`.
-- Before output, remove one accessory element if it adds nothing — restraint is the Apple look.
+- Before output, remove one accessory element if it adds nothing. The title band, tricolour
+  rule and NIE blue accents must be present.

@@ -304,12 +304,17 @@ export function buildGenerateImageTool(
         );
       }
 
-      const options = resolveImageSize({
-        prompt: params.styleHint
-          ? `${prompt}\nStyle direction: ${params.styleHint.trim()}`
-          : prompt,
-        aspectRatio: params.aspectRatio ?? '16:9',
-      });
+      const options = resolveImageSize(
+        {
+          prompt: params.styleHint
+            ? `${prompt}\nStyle direction: ${params.styleHint.trim()}`
+            : prompt,
+          aspectRatio: params.aspectRatio ?? '16:9',
+        },
+        // Fork: pass the provider/model so size rules apply (GPT Image models
+        // reject 16:9 at 1024x576 and need 1536x1024).
+        { providerId, modelId: model },
+      );
       const ioSignal = combineSignals(callerSignal, deps.timeoutMs ?? GENERATE_IMAGE_TIMEOUT_MS);
 
       try {

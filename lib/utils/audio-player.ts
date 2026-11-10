@@ -16,6 +16,73 @@ const log = createLogger('AudioPlayer');
  * endpoint must not pin a playback line indefinitely. */
 const LEGACY_URL_FETCH_TIMEOUT_MS = 15_000;
 
+/**
+ * Fork: keep the audio output awake between narration clips.
+ *
+ * Narration clips start speaking almost immediately (Azure TTS leaves ~60 ms of
+ * lead-in) and each line is a separate clip. Audio outputs that power down
+ * when idle (Bluetooth headsets, HDMI/USB speakers, many laptops) take
+ * 100-300 ms to wake, swallowing the first word. A silent Web Audio stream
+ * keeps the output open while a lesson is narrating; the first clip waits
+ * briefly for the device to wake, later clips play at once. The stream closes
+ * after a quiet spell so an idle page holds nothing open.
+ */
+const OUTPUT_WAKE_MS = 300;
+const KEEP_ALIVE_IDLE_MS = 15_000;
+
+class OutputKeepAlive {
+  private context: AudioContext | null = null;
+  private startedAt = 0;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Make sure the output is awake; resolves once it is ready to play. */
+  async ensureAwake(): Promise<void> {
+    this.clearIdleTimer();
+    if (typeof window === 'undefined') return;
+    const AudioContextClass =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    try {
+      if (!this.context || this.context.state === 'closed') {
+        this.context = new AudioContextClass();
+        // A silent source keeps the stream (and so the device) open.
+        const silence = this.context.createConstantSource();
+        silence.offset.value = 0;
+        silence.connect(this.context.destination);
+        silence.start();
+        this.startedAt = performance.now();
+      }
+      if (this.context.state === 'suspended') {
+        await this.context.resume();
+        this.startedAt = performance.now();
+      }
+      const waited = performance.now() - this.startedAt;
+      if (waited < OUTPUT_WAKE_MS) {
+        await new Promise((resolve) => setTimeout(resolve, OUTPUT_WAKE_MS - waited));
+      }
+    } catch {
+      // Best effort: without Web Audio, narration still plays as before.
+    }
+  }
+
+  /** Close the stream after a quiet spell. */
+  scheduleSleep(): void {
+    this.clearIdleTimer();
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      const context = this.context;
+      this.context = null;
+      void context?.close().catch(() => undefined);
+    }, KEEP_ALIVE_IDLE_MS);
+  }
+
+  private clearIdleTimer(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = null;
+  }
+}
+
 /** Bytes an audio id currently resolves to, pool first. Loaded lazily to keep
  * this module importable without the media graph. */
 async function resolveBytes(audioId: string): Promise<Blob | null> {
@@ -37,6 +104,7 @@ export class AudioPlayer {
   private volume: number = 1;
   private playbackRate: number = 1;
   private requestToken: number = 0;
+  private readonly keepAlive = new OutputKeepAlive();
   /** The object URL backing the current audio element, if any. */
   private blobUrl: string | null = null;
   /**
@@ -141,6 +209,10 @@ export class AudioPlayer {
       this.stopAudioElement();
       if (requestToken !== this.requestToken) return false;
 
+      // Fork: wake the audio output first so the opening word is not lost.
+      await this.keepAlive.ensureAwake();
+      if (requestToken !== this.requestToken) return false;
+
       // Create audio element
       this.audio = new Audio();
 
@@ -158,6 +230,7 @@ export class AudioPlayer {
       // Set ended callback
       this.audio.addEventListener('ended', () => {
         this.releaseBlobUrl(blobUrl);
+        this.keepAlive.scheduleSleep();
         this.onEndedCallback?.();
       });
 
@@ -202,6 +275,7 @@ export class AudioPlayer {
     // settle: the play was superseded and its result is unwanted.
     this.abortLegacyFetch();
     this.stopAudioElement();
+    this.keepAlive.scheduleSleep();
     // Note: onEndedCallback intentionally NOT cleared here because play()
     // calls stop() internally — clearing would break the callback chain.
     // Stale callbacks are harmless: engine mode check prevents processNext().

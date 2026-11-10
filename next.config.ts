@@ -45,6 +45,9 @@ const nextConfig: NextConfig = {
     // egress cannot resolve their SDK in the shipped deployment.
     '@aws-sdk/client-s3',
     '@aws-sdk/s3-request-presigner',
+    // Fork: headless Chromium for the interactive-page visual review
+    // (lib/server/interactive-qa). Loaded lazily, only when enabled.
+    '@playwright/test',
   ],
   experimental: {
     proxyClientMaxBodySize: '200mb',

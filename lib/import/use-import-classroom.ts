@@ -1,5 +1,6 @@
 'use client';
 
+import { newCourseId } from '@/lib/utils/course-id';
 import { useState, useCallback, useRef } from 'react';
 import { nanoid } from 'nanoid';
 import { toast } from 'sonner';
@@ -393,7 +394,7 @@ export function useImportClassroom(onSuccess?: (importedStageId: string) => void
         }
 
         // 3. Generate new IDs
-        const newStageId = nanoid();
+        const newStageId = newCourseId();
         importedStageId = newStageId;
         const now = Date.now();
 

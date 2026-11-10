@@ -380,7 +380,13 @@ export function ASRSettings({ selectedProviderId }: ASRSettingsProps) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {asrProvider?.models.map((model) => (
+              {(asrProvidersConfig[selectedProviderId]?.serverModels?.length
+                ? asrProvidersConfig[selectedProviderId].serverModels!.map((id) => ({
+                    id,
+                    name: asrProvider?.models.find((m) => m.id === id)?.name || id,
+                  }))
+                : asrProvider?.models
+              ).map((model) => (
                 <SelectItem key={model.id} value={model.id}>
                   {model.name}
                 </SelectItem>

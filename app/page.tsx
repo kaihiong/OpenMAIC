@@ -1,5 +1,7 @@
 'use client';
 
+import { migrateBrowserCourses } from '@/lib/persistence/browser-course-migration';
+import { WelcomeNotice } from '@/components/welcome-notice';
 import { useState, useEffect, useMemo, useRef, useDeferredValue } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
@@ -26,6 +28,7 @@ import {
   Atom,
   X,
   LogOut,
+  ShieldCheck,
   Presentation,
   Loader2,
 } from 'lucide-react';
@@ -132,7 +135,7 @@ function HomePage() {
   const { t } = useI18n();
   const { theme, setTheme } = useTheme();
   const router = useRouter();
-  const { nieAuthEnabled, logout } = useNieAuth();
+  const { nieAuthEnabled, user: nieUser, logout } = useNieAuth();
   // Do not replay the classic hero's entrance after the route handoff already
   // carried the lockup and composer into place.
   const [swapped] = useState(arrivedByProSwap);
@@ -346,7 +349,27 @@ function HomePage() {
     // Read sessionStorage on the client only (avoids SSR hydration mismatch).
     // Both reads resolve before flipping `hydrated`, so the hero layout does
     // not thrash as each lands independently.
-    void Promise.all([loadClassrooms(), loadFolders()]).finally(() => setHydrated(true));
+    void Promise.all([loadClassrooms(), loadFolders()])
+      .finally(() => setHydrated(true))
+      // Fork: copy courses that only exist in this browser to the signed-in
+      // user's server account, once, then refresh the list.
+      .then(() => migrateBrowserCourses())
+      .then((result) => {
+        if (result.migrated.length > 0) {
+          toast.success(
+            result.migrated.length === 1
+              ? `Copied “${result.migrated[0].name}” from this browser to your account.`
+              : `Copied ${result.migrated.length} courses from this browser to your account.`,
+          );
+          void loadClassrooms();
+        }
+        if (result.failed.length > 0) {
+          toast.error(
+            `${result.failed.length} course${result.failed.length === 1 ? '' : 's'} from this browser could not be copied. They are still saved in this browser.`,
+          );
+        }
+      })
+      .catch((error) => log.warn('Browser course migration failed:', error));
 
     return () => {
       revokeThumbnailSlideMediaUrls(thumbnailsRef.current);
@@ -805,6 +828,21 @@ function HomePage() {
           </button>
         </div>
 
+        {/* Fork: Admin entry, only for administrators */}
+        {nieUser?.isAdmin && (
+          <>
+            <div className="w-[1px] h-4 bg-gray-200 dark:bg-gray-700" />
+            <button
+              onClick={() => router.push('/admin')}
+              title="Admin"
+              aria-label="Admin"
+              className="p-2 rounded-full text-gray-400 dark:text-gray-500 hover:bg-white dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200 hover:shadow-sm transition-all"
+            >
+              <ShieldCheck className="w-4 h-4" />
+            </button>
+          </>
+        )}
+
         {/* Logout Button */}
         {nieAuthEnabled && (
           <>
@@ -877,10 +915,25 @@ function HomePage() {
           initial={heroEnter({ opacity: 0 })}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.25 }}
-          className="text-sm text-muted-foreground/60 mb-8"
+          className="text-sm text-muted-foreground/60 mb-5"
+          data-pro-morph="tagline"
         >
           {t('home.slogan')}
         </motion.p>
+
+        {/* ── Fork: NIE welcome and data-handling notice ── */}
+        <motion.div
+          initial={heroEnter({ opacity: 0, y: 6 })}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mb-6 flex w-full justify-center"
+        >
+          <WelcomeNotice
+            modeSwitch={
+              workbenchEntryEnabled ? { direction: 'enter', onClick: enterWorkbench } : undefined
+            }
+          />
+        </motion.div>
 
         {/* ── Unified input area ── */}
         <motion.div

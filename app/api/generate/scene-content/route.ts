@@ -33,6 +33,7 @@ import {
   type VisionPromptImage,
 } from '@/lib/persistence/resolve-vision-images';
 import { generatePBLV2Project } from '@/lib/pbl/v2/agents/planner';
+import { interactiveReviewOption } from '@/lib/server/interactive-qa/review';
 
 const log = createLogger('Scene Content API');
 
@@ -322,6 +323,7 @@ export async function POST(req: NextRequest) {
     const userLocale = req.headers?.get('x-user-locale') ?? '';
 
     const content = await generateSceneContent(effectiveOutline, aiCall, {
+      ...interactiveReviewOption(),
       assignedImages,
       imageMapping: visionImageMapping,
       visionEnabled: hasVision,

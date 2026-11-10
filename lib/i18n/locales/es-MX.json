@@ -11,7 +11,18 @@
   },
   "home": {
     "slogan": "Aprendizaje generativo en un aula interactiva multiagente",
-    "greetingWithName": "Hola, {{name}}"
+    "greetingWithName": "Hola, {{name}}",
+    "welcome": {
+      "title": "¡Bienvenido a OpenMAIC! Nos alegra que estés aquí.",
+      "environment": "Esta versión funciona dentro del entorno del NIE. Para mantenernos seguros, sube solo materiales clasificados como “Confidential” (confidencial) o de un nivel inferior, y no incluyas datos personales.",
+      "supportPrefix": "¿Algo no funciona? Escríbenos a",
+      "supportSuffix": ".",
+      "proPrompt": "¿Quieres crear y perfeccionar un curso paso a paso con un asistente de IA?",
+      "enterPro": "Entrar al modo Pro",
+      "classicPrompt": "¿Prefieres crear una lección completa de una sola vez?",
+      "backToClassic": "Volver al modo clásico",
+      "signOff": "¡Que disfrutes enseñando y aprendiendo!"
+    }
   },
   "toolbar": {
     "pdfParser": "Analizador",
@@ -1758,7 +1769,7 @@
     "selectAgents": "Seleccionar agentes",
     "noVisionWarning": "El modelo actual no admite visión. Las imágenes aún pueden colocarse en las diapositivas, pero el modelo no puede entender su contenido para optimizar la selección y el diseño",
     "serverConfigured": "Servidor",
-    "serverConfiguredNotice": "Este proveedor lo administra el servidor y no puede editarse aquí. Para usar tus propias credenciales, agrega un proveedor aparte.",
+    "serverConfiguredNotice": "Este proveedor lo administra el servidor y no puede editarse aquí.",
     "ttsProviderEnabledLabel": "Habilitar este proveedor",
     "ttsProviderEnabledHint": "Al desactivarlo, este proveedor se oculta del selector de voces y nunca se asigna automáticamente.",
     "ttsProviderUnavailableHint": "Configura este proveedor antes de habilitarlo.",

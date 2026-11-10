@@ -13,8 +13,8 @@
  * enabled without a DATABASE_URL answers the same plain 404 as the agent
  * control-plane routes — never a 500 from a store that cannot connect.
  */
+import { newCourseId } from '@/lib/utils/course-id';
 import type { NextRequest } from 'next/server';
-import { randomBytes } from 'node:crypto';
 
 import { isAgentRuntimeConfigured } from '@/lib/config/feature-flags';
 import type { AppDocumentOutline } from '@/lib/document-store/persistence-types';
@@ -26,9 +26,9 @@ import { withRequestOwnerId } from '@/lib/server/agent-runtime/with-owner';
 
 export const runtime = 'nodejs';
 
-/** Mint a fresh, collision-free course id in the same `stage-` family as the agent tools. */
+/** Mint a fresh course id (fork: UUID, see lib/utils/course-id.ts). */
 function createStageId(): string {
-  return `stage-${randomBytes(9).toString('base64url')}`;
+  return newCourseId();
 }
 
 // GET /api/stages — list every stage document owned by the caller.

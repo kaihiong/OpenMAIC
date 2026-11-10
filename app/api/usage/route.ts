@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createLogger } from '@/lib/logger';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
+import { isAdminOwner, signedInOwner } from '@/lib/server/admin/admins';
 import {
   readUsageRecords,
   type UsageRecord,
@@ -58,8 +59,25 @@ function addTo(bucket: Bucket, r: UsageRecord): void {
   bucket.quantity += r.quantity ?? 0;
 }
 
+/** Fork: days are counted in the deployment's time zone (default Singapore). */
+const USAGE_TIME_ZONE = process.env.OPENMAIC_TIMEZONE?.trim() || 'Asia/Singapore';
+const dayFormat = new Intl.DateTimeFormat('en-CA', {
+  timeZone: USAGE_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 function dayKey(createdAt: number): string {
-  return new Date(createdAt).toISOString().slice(0, 10);
+  return dayFormat.format(new Date(createdAt)); // en-CA => YYYY-MM-DD
+}
+
+/** Epoch ms from an ISO instant or number; undefined when absent or invalid. */
+function parseInstant(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const asNumber = Number(value);
+  const ms = Number.isFinite(asNumber) ? asNumber : Date.parse(value);
+  return Number.isFinite(ms) ? ms : undefined;
 }
 
 /**
@@ -73,8 +91,30 @@ export async function GET(req: NextRequest) {
     const monthsParam = req.nextUrl.searchParams.get('months');
     const months = monthsParam ? monthsParam.split(',').map((s) => s.trim()) : undefined;
 
-    const records = await readUsageRecords({ months });
+    // Fork: users see only their own usage. An admin may ask for everyone's
+    // (`?scope=all`), which also returns a per-user breakdown.
+    const owner = signedInOwner(req.headers);
+    const params = req.nextUrl.searchParams;
+    const wantsAll = params.get('scope') === 'all';
+    // Fork: optional period (`since`/`until`, ISO or epoch ms) and, for
+    // admins, one user (`owner=nie:<id>`).
+    const since = parseInstant(params.get('since'));
+    const until = parseInstant(params.get('until'));
+    const ownerFilter = params.get('owner')?.trim() || undefined;
+    if (wantsAll && !isAdminOwner(owner)) {
+      return apiError('UNAUTHORIZED', 403, 'Only administrators can see everyone’s usage');
+    }
+    if (!wantsAll && !owner && process.env.NIE_AUTH_API_URL) {
+      return apiError('UNAUTHORIZED', 401, 'Not authenticated');
+    }
+    const records = await readUsageRecords({
+      months,
+      since,
+      until,
+      ownerId: wantsAll ? ownerFilter : owner,
+    });
 
+    const byUser = new Map<string, Bucket>();
     const byModel = new Map<string, Bucket>();
     const byDay = new Map<string, Bucket>();
     const byKind = new Map<UsageKind, Bucket>();
@@ -97,13 +137,23 @@ export async function GET(req: NextRequest) {
 
       if (!byKind.has(r.kind)) byKind.set(r.kind, emptyBucket(r.kind, r.kind, unitOf(r)));
       addTo(byKind.get(r.kind)!, r);
+
+      if (wantsAll) {
+        const uk = r.ownerId ?? 'unknown';
+        if (!byUser.has(uk)) byUser.set(uk, emptyBucket(uk, 'llm', 'token'));
+        addTo(byUser.get(uk)!, r);
+      }
     }
 
     return apiSuccess({
+      timeZone: USAGE_TIME_ZONE,
       totals: { requests: totalRequests, llmTokens: totalLlmTokens },
       byModel: [...byModel.values()].sort((a, b) => b.requests - a.requests),
       byDay: [...byDay.values()].sort((a, b) => a.key.localeCompare(b.key)),
       byKind: [...byKind.values()],
+      ...(wantsAll
+        ? { byUser: [...byUser.values()].sort((a, b) => b.totalTokens - a.totalTokens) }
+        : {}),
     });
   } catch (error) {
     log.error('Usage aggregation failed:', error);

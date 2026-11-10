@@ -2421,7 +2421,9 @@ export function getModel(config: ModelConfig): ModelWithInfo {
         baseURL: effectiveBaseUrl,
         fetch: azureFetch,
       });
-      model = azureClient.chat(config.modelId);
+      model = config.responsesApi
+        ? azureClient.responses(config.modelId)
+        : azureClient.chat(config.modelId);
       break;
     }
 

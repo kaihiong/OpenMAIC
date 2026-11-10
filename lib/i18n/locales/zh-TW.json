@@ -11,7 +11,18 @@
   },
   "home": {
     "slogan": "多智能體互動課室中的生成式學習",
-    "greetingWithName": "嗨，{{name}}"
+    "greetingWithName": "嗨，{{name}}",
+    "welcome": {
+      "title": "歡迎使用 OpenMAIC！很高興見到你。",
+      "environment": "此版本運行於 NIE 環境中。為了保障大家的安全，請只上傳密級為「機密」（Confidential）或以下的資料，並且不要上傳任何個人資料。",
+      "supportPrefix": "遇到問題？歡迎寄信至",
+      "supportSuffix": "。",
+      "proPrompt": "想在 AI 助手的協助下一步步建構並完善課程嗎？",
+      "enterPro": "進入專業模式",
+      "classicPrompt": "想一次產生一堂完整的課嗎？",
+      "backToClassic": "返回經典模式",
+      "signOff": "祝你教學愉快，學習愉快！"
+    }
   },
   "toolbar": {
     "pdfParser": "解析器",
@@ -1743,7 +1754,7 @@
     "selectAgents": "選擇智能體",
     "noVisionWarning": "目前模型不支援視覺能力，圖片仍可放入投影片，但模型無法理解圖片內容來優化選擇和排版",
     "serverConfigured": "服務端",
-    "serverConfiguredNotice": "此供應商由伺服器端管理，無法在此編輯。如需使用自己的憑證，請新增一個供應商。",
+    "serverConfiguredNotice": "此供應商由伺服器端管理，無法在此編輯。",
     "ttsProviderEnabledLabel": "啟用此供應商",
     "ttsProviderEnabledHint": "關閉後，此供應商將不會出現在語音選擇器中，也不會被自動分配。",
     "ttsProviderUnavailableHint": "請先設定此供應商再啟用。",

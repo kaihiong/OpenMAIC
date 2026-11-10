@@ -103,8 +103,11 @@ export function TTSSettings({ selectedProviderId }: TTSSettingsProps) {
   const isCustom = isCustomTTSProvider(selectedProviderId);
   // Voice-clone models are resolved from the picked voice, never chosen by
   // hand, so they are hidden from the manual model list.
-  const manuallySelectableModels = getManuallySelectableTTSModels(selectedProviderId);
   const providerConfig = ttsProvidersConfig[selectedProviderId];
+  // A server-pinned model list replaces the catalogue's.
+  const manuallySelectableModels = providerConfig?.serverModels?.length
+    ? providerConfig.serverModels.map((id) => ({ id, name: id }))
+    : getManuallySelectableTTSModels(selectedProviderId);
   const isServerConfigured = !!providerConfig?.isServerConfigured;
   // Per-provider enablement (#665): the toggle is meaningful only for an
   // AVAILABLE provider (configured / server-managed). An unconfigured provider

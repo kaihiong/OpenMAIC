@@ -15,7 +15,8 @@ interface ProviderListProps {
   providers: ProviderWithServerInfo[];
   selectedProviderId: ProviderId;
   onSelect: (providerId: ProviderId) => void;
-  onAddProvider: () => void;
+  /** Omit to hide the Add button (server-providers-only mode). */
+  onAddProvider?: () => void;
   width?: number;
 }
 
@@ -65,7 +66,7 @@ export function ProviderList({
             ) : (
               <Box className="h-5 w-5 text-muted-foreground" />
             )}
-            <span className="font-medium text-sm flex-1 truncate">
+            <span className="font-medium text-sm flex-1 min-w-0 break-words leading-snug">
               {getProviderDisplayName(provider)}
             </span>
             {provider.isServerConfigured && (
@@ -78,12 +79,14 @@ export function ProviderList({
       </div>
 
       {/* Add Provider Button */}
-      <div className="p-3 border-t">
-        <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={onAddProvider}>
-          <Plus className="h-3.5 w-3.5" />
-          {t('settings.addProviderButton')}
-        </Button>
-      </div>
+      {onAddProvider && (
+        <div className="p-3 border-t">
+          <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={onAddProvider}>
+            <Plus className="h-3.5 w-3.5" />
+            {t('settings.addProviderButton')}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

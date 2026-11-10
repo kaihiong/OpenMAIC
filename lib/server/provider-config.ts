@@ -26,6 +26,8 @@ interface ServerProviderEntry {
   apiKey: string;
   baseUrl?: string;
   models?: string[];
+  /** Name shown to users instead of the built-in one (`<PREFIX>_DISPLAY_NAME`). */
+  displayName?: string;
   proxy?: string;
   /** Aliyun AccessKey ID (AliDocMind — uses AK/SK instead of a single apiKey). */
   accessKeyId?: string;
@@ -278,6 +280,7 @@ function loadEnvSection(
     const envApiKey = process.env[`${prefix}_API_KEY`] || undefined;
     const envBaseUrl = process.env[`${prefix}_BASE_URL`] || undefined;
     const envModelsStr = process.env[`${prefix}_MODELS`];
+    const envDisplayName = process.env[`${prefix}_DISPLAY_NAME`]?.trim() || undefined;
     const envModels = envModelsStr
       ? envModelsStr
           .split(',')
@@ -290,6 +293,7 @@ function loadEnvSection(
       if (envApiKey) result[providerId].apiKey = envApiKey;
       if (envBaseUrl) result[providerId].baseUrl = envBaseUrl;
       if (envModels) result[providerId].models = envModels;
+      if (envDisplayName) result[providerId].displayName = envDisplayName;
       continue;
     }
 
@@ -304,6 +308,7 @@ function loadEnvSection(
       apiKey: envApiKey || '',
       baseUrl: envBaseUrl,
       models: envModels,
+      displayName: envDisplayName,
     };
   }
 
@@ -386,6 +391,7 @@ function applyAzureOpenAIImageFallback(
     apiKey,
     baseUrl: yamlEntry?.baseUrl || process.env.IMAGE_AZURE_OPENAI_BASE_URL || baseUrl,
     models,
+    displayName: process.env.IMAGE_AZURE_OPENAI_DISPLAY_NAME?.trim() || undefined,
   };
   return imageConfig;
 }
@@ -635,6 +641,16 @@ export function enabledProviderIds<T extends { disabled?: boolean }>(
   return Object.keys(listing).filter((id) => !listing[id]?.disabled);
 }
 
+/**
+ * Server-providers-only mode (`OPENMAIC_SERVER_PROVIDERS_ONLY=true`): users may
+ * only use providers the server manages. Client-supplied keys and base URLs are
+ * ignored, so an unmanaged provider has no credentials and its calls fail,
+ * whatever the browser sends. The settings UI also hides unmanaged providers.
+ */
+export function isServerProvidersOnly(): boolean {
+  return /^(true|1)$/i.test(process.env.OPENMAIC_SERVER_PROVIDERS_ONLY?.trim() ?? '');
+}
+
 function resolveSectionApiKey(
   section: ProviderSection,
   providerId: string,
@@ -642,6 +658,7 @@ function resolveSectionApiKey(
 ): string {
   const entry = getConfig()[section][providerId];
   if (entry) return entry.apiKey || ''; // managed: server key is authoritative
+  if (isServerProvidersOnly()) return ''; // users may not bring their own key
   return clientKey || ''; // unmanaged: client-supplied key only
 }
 
@@ -652,6 +669,7 @@ function resolveSectionBaseUrl(
 ): string | undefined {
   const entry = getConfig()[section][providerId];
   if (entry) return entry.baseUrl; // managed: server base URL is authoritative
+  if (isServerProvidersOnly()) return undefined; // users may not point at their own endpoint
   return clientBaseUrl; // unmanaged: client-supplied base URL only
 }
 
@@ -664,12 +682,13 @@ function resolveSectionBaseUrl(
  * and the "managed" flag (presence in this map) — never the API key or the
  * base URL, which can reveal internal gateway/proxy infrastructure.
  */
-export function getServerProviders(): Record<string, { models?: string[] }> {
+export function getServerProviders(): Record<string, { models?: string[]; displayName?: string }> {
   const cfg = getConfig();
-  const result: Record<string, { models?: string[] }> = {};
+  const result: Record<string, { models?: string[]; displayName?: string }> = {};
   for (const [id, entry] of Object.entries(cfg.providers)) {
     result[id] = {};
     if (entry.models && entry.models.length > 0) result[id].models = entry.models;
+    if (entry.displayName) result[id].displayName = entry.displayName;
   }
   return result;
 }
@@ -699,10 +718,25 @@ export function resolveProxy(providerId: string): string | undefined {
  * providers (`{ disabled: true }`). A force-disabled provider is reported as
  * disabled even when it is otherwise configured — disable wins (#665).
  */
-export function getServerTTSProviders(): Record<string, { disabled?: boolean }> {
+export function getServerTTSProviders(): Record<
+  string,
+  { disabled?: boolean; models?: string[]; displayName?: string; icon?: string }
+> {
   const cfg = getConfig();
-  const result: Record<string, { disabled?: boolean }> = {};
-  for (const id of Object.keys(cfg.tts)) result[id] = {};
+  const result: Record<
+    string,
+    { disabled?: boolean; models?: string[]; displayName?: string; icon?: string }
+  > = {};
+  for (const [id, entry] of Object.entries(cfg.tts)) {
+    result[id] = {};
+    if (entry.models && entry.models.length > 0) result[id].models = entry.models;
+    if (entry.displayName) result[id].displayName = entry.displayName;
+    // An OpenAI-protocol provider served from Azure shows the Azure logo. The
+    // host name is the only part of the base URL that leaves the server.
+    if (entry.baseUrl && /\.openai\.azure\.com/i.test(entry.baseUrl)) {
+      result[id].icon = '/logos/azure.svg';
+    }
+  }
   for (const id of cfg.disabled.tts) result[id] = { disabled: true };
   return result;
 }
@@ -808,10 +842,25 @@ export function resolveTTSModel(
  * (presence = managed flag) plus operator force-disabled providers
  * (`{ disabled: true }`), mirroring the TTS listing — disable wins (#665).
  */
-export function getServerASRProviders(): Record<string, { disabled?: boolean }> {
+export function getServerASRProviders(): Record<
+  string,
+  { disabled?: boolean; models?: string[]; displayName?: string; icon?: string }
+> {
   const cfg = getConfig();
-  const result: Record<string, { disabled?: boolean }> = {};
-  for (const id of Object.keys(cfg.asr)) result[id] = {};
+  const result: Record<
+    string,
+    { disabled?: boolean; models?: string[]; displayName?: string; icon?: string }
+  > = {};
+  for (const [id, entry] of Object.entries(cfg.asr)) {
+    result[id] = {};
+    if (entry.models && entry.models.length > 0) result[id].models = entry.models;
+    if (entry.displayName) result[id].displayName = entry.displayName;
+    // Same rule as TTS: an OpenAI-protocol provider served from Azure shows the
+    // Azure logo; only the host name check leaves the server.
+    if (entry.baseUrl && /\.openai\.azure\.com/i.test(entry.baseUrl)) {
+      result[id].icon = '/logos/azure.svg';
+    }
+  }
   for (const id of cfg.disabled.asr) result[id] = { disabled: true };
   return result;
 }
@@ -872,13 +921,15 @@ export function resolvePDFBaseUrl(providerId: string, clientBaseUrl?: string): s
  */
 export function getServerImageProviders(): Record<
   string,
-  { models?: string[]; disabled?: boolean }
+  { models?: string[]; disabled?: boolean; displayName?: string }
 > {
   const cfg = getConfig();
-  const result: Record<string, { models?: string[]; disabled?: boolean }> = {};
+  const result: Record<string, { models?: string[]; disabled?: boolean; displayName?: string }> =
+    {};
   for (const [id, entry] of Object.entries(cfg.image)) {
     result[id] = {};
     if (entry.models && entry.models.length > 0) result[id].models = entry.models;
+    if (entry.displayName) result[id].displayName = entry.displayName;
   }
   for (const id of cfg.disabled.image) result[id] = { disabled: true };
   return result;

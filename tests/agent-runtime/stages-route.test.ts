@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { UUID_PATTERN } from '@/lib/utils/course-id';
 import { NextRequest } from 'next/server';
 
 import type { AppDocumentOutline } from '@/lib/document-store/persistence-types';
@@ -110,7 +111,8 @@ describe('POST /api/stages', () => {
     );
     expect(response.status).toBe(201);
     const body = await response.json();
-    expect(body.stage.id).toMatch(/^stage-[A-Za-z0-9_-]{10,}$/);
+    // Fork: course ids are UUIDs.
+    expect(body.stage.id).toMatch(UUID_PATTERN);
     expect(body.stage).toMatchObject({
       name: 'Day 1 — Python',
       sceneCount: 0,

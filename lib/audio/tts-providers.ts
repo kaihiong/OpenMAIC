@@ -92,6 +92,7 @@
  * - URL-based: For providers returning audio URL (download in second step)
  */
 
+import { coerceVoiceForTTSModel } from '@/lib/audio/legacy-tts-voices';
 import type { TTSModelConfig } from './types';
 import { isCustomTTSProvider } from './types';
 import { isQwenCloneVoice, resolveTTSModelForVoice, TTS_PROVIDERS } from './constants';
@@ -328,7 +329,9 @@ async function generateOpenAITTS(
     body: JSON.stringify({
       model: config.modelId || 'gpt-4o-mini-tts',
       input: text,
-      voice: config.voice,
+      // Older models (e.g. an Azure `tts-hd` deployment) reject the newer
+      // voices; swap in the closest classic one instead of failing.
+      voice: coerceVoiceForTTSModel(config.modelId || 'gpt-4o-mini-tts', config.voice),
       speed: config.speed || 1.0,
     }),
     signal,

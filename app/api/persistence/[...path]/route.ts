@@ -27,6 +27,11 @@ import { readStageMeta } from '@/lib/persistence/stage-meta';
 import { APP_RUNTIME_PAYLOAD_VALIDATORS } from '@/lib/runtime/payload-validators';
 import { withRequestOwnerId } from '@/lib/server/agent-runtime/with-owner';
 
+/** NIE AD login is on (middleware then verifies every request's session). */
+function isNieAuthConfigured(): boolean {
+  return !!process.env.NIE_AUTH_API_URL?.trim();
+}
+
 export const runtime = 'nodejs';
 
 const ROUTE_PREFIX = '/api/persistence';
@@ -147,6 +152,9 @@ async function createPersistenceHandler(
       if (request.url?.startsWith('/assets')) {
         return { key: SHARED_ASSET_PRINCIPAL, learnerKey: ownerId };
       }
+      // Fork: with NIE login, runtime sessions belong to the verified user,
+      // never to a client-supplied x-learner-key.
+      if (isNieAuthConfigured()) return { learnerKey: ownerId };
       return authenticatePersistenceRequest(request);
     },
     authorizeAssets: async (_principal, request) => {
@@ -318,7 +326,9 @@ export async function handlePersistenceRequest(
   if (!connectionString) {
     return jsonError(404, 'PERSISTENCE_NOT_CONFIGURED', 'server persistence not configured');
   }
-  if (!process.env.PERSISTENCE_DEV_TOKEN) {
+  // Fork: the dev token only guards the upstream development authenticator.
+  // With NIE login every principal is derived from the verified session.
+  if (!isNieAuthConfigured() && !process.env.PERSISTENCE_DEV_TOKEN) {
     return jsonError(
       503,
       'PERSISTENCE_DEV_TOKEN_MISSING',

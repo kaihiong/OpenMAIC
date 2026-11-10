@@ -3,6 +3,7 @@ import {
   isServerConfiguredProvider,
   isServerProviderDisabled,
   resolveWebSearchApiKey,
+  isServerProvidersOnly,
   resolveWebSearchBaseUrl,
   resolveWebSearchModel,
 } from '@/lib/server/provider-config';
@@ -107,10 +108,15 @@ export function resolveClassroomWebSearchConfig(input: {
   // A force-disabled requested provider yields to the operator's server default
   // (server precedence, #665); resolveServerWebSearchProviderId already skips
   // disabled providers internally.
+  // Fork: in server-providers-only mode a provider the server does not manage
+  // (e.g. Brave's key-less HTML scrape) is never used; the server default wins.
+  const requestedAllowed =
+    !!requestedProviderId &&
+    !isServerProviderDisabled('webSearch', requestedProviderId) &&
+    (!isServerProvidersOnly() || isServerConfiguredProvider('webSearch', requestedProviderId));
   const providerId =
-    (requestedProviderId && !isServerProviderDisabled('webSearch', requestedProviderId)
-      ? requestedProviderId
-      : undefined) ?? (resolveServerWebSearchProviderId() as WebSearchProviderId | undefined);
+    (requestedAllowed ? requestedProviderId : undefined) ??
+    (resolveServerWebSearchProviderId() as WebSearchProviderId | undefined);
   if (!providerId) return undefined;
 
   const provider = WEB_SEARCH_PROVIDERS[providerId];

@@ -75,9 +75,13 @@ type ToolResult = {
 describe('generate_video tool', () => {
   beforeEach(() => {
     clearPendingMediaTasks();
+    // Fork: video generation is off unless this is set; these tests cover the
+    // tool with video allowed.
+    vi.stubEnv('NEXT_PUBLIC_VIDEO_GENERATION_ENABLED', 'true');
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.clearAllMocks();
     clearPendingMediaTasks();
@@ -120,6 +124,16 @@ describe('generate_video tool', () => {
     });
     expect(buildDslCourseToolset(deps).map((tool) => tool.name)).toContain('generate_video');
     expect(buildCourseAllowlist(deps)).toContain('generate_video');
+  });
+
+  it('never registers while video generation is switched off', () => {
+    vi.stubEnv('NEXT_PUBLIC_VIDEO_GENERATION_ENABLED', '');
+    const deps = courseDeps({
+      getConfiguredVideoProviders: configured,
+      resolveVideoProviderConfig: () => providerConfig,
+    });
+    expect(buildDslCourseToolset(deps).map((tool) => tool.name)).not.toContain('generate_video');
+    expect(buildCourseAllowlist(deps)).not.toContain('generate_video');
   });
 
   it('fails loud when the server resolves no model for a model-bearing provider', async () => {

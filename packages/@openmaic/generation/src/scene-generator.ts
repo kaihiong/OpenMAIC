@@ -116,7 +116,58 @@ export interface SceneContentOptions {
   pblLoopFallback?: (input: PBLPlannerV2Input) => Promise<PBLProject>;
   onFailure?: (failure: SceneContentFailure) => void;
   logger?: GenerationLogger;
+  /**
+   * Fork: extra build guidance for interactive (widget) pages, supplied by an
+   * active course skill. Appended to the widget system prompt after every
+   * built-in rule, so it raises the bar without replacing the required
+   * contract (IDs, widget config, postMessage listener, stage format).
+   */
+  widgetDirective?: string;
+  /**
+   * Fork: optional visual review of a generated interactive page (the host
+   * renders it in a real browser). Problems found trigger ONE repair pass.
+   */
+  reviewInteractive?: InteractiveReviewFn;
+  /**
+   * Fork: optional fast repair for layout-only problems (e.g. a small CSS patch
+   * from a quicker model). When absent, or when the review says the page needs
+   * a rewrite, the page model regenerates the whole page instead.
+   */
+  repairInteractive?: InteractiveRepairFn;
 }
+
+/** Fork: what a visual review of an interactive page found. */
+export interface InteractiveReview {
+  /** Human-readable problems, each specific enough to act on. Empty = passed. */
+  issues: string[];
+  /** Optional screenshot (data URL) shown to the model during repair. */
+  screenshot?: string;
+  /**
+   * True when a patch cannot fix it (wrong-language text, script errors, an
+   * empty page): the page model must rewrite the page.
+   */
+  needsRewrite?: boolean;
+  /**
+   * The subset of `issues` that are real faults (wrong language, script errors,
+   * an empty page). Without skill guidance only these are repaired, so the page
+   * keeps the standard upstream look instead of being re-laid-out.
+   */
+  blockingIssues?: string[];
+  /** Severity-weighted total (higher = worse); compared instead of the issue count when given. */
+  score?: number;
+}
+
+/** Fork: returns repaired HTML, or null when it could not produce one. */
+export type InteractiveRepairFn = (
+  html: string,
+  review: InteractiveReview,
+  context: { title: string; widgetType: string },
+) => Promise<string | null>;
+
+export type InteractiveReviewFn = (
+  html: string,
+  context: { title: string; widgetType: string },
+) => Promise<InteractiveReview | null>;
 
 export interface SceneActionsOptions {
   ctx?: SceneGenerationContext;
@@ -276,6 +327,9 @@ export async function generateSceneContent(
       allowProceduralSkill,
       logger: log,
       onFailure: options.onFailure,
+      widgetDirective: options.widgetDirective,
+      reviewInteractive: options.reviewInteractive,
+      repairInteractive: options.repairInteractive,
     });
   }
 
@@ -1152,6 +1206,12 @@ export async function generateWidgetContent(
     allowProceduralSkill?: boolean;
     logger?: GenerationLogger;
     onFailure?: (failure: SceneContentFailure) => void;
+    /** See `SceneContentOptions.widgetDirective`. */
+    widgetDirective?: string;
+    /** See `SceneContentOptions.reviewInteractive`. */
+    reviewInteractive?: InteractiveReviewFn;
+    /** See `SceneContentOptions.repairInteractive`. */
+    repairInteractive?: InteractiveRepairFn;
   } = {},
 ): Promise<GeneratedInteractiveContent | null> {
   const log = options.logger ?? noopGenerationLogger;
@@ -1268,14 +1328,40 @@ export async function generateWidgetContent(
     return null;
   }
 
+  const directive = options.widgetDirective?.trim();
+  const system = directive
+    ? `${prompts.system}\n\n## Active Skill: Additional Build Guidance\n\n` +
+      'The teacher chose one or more skills for this course. Follow their guidance below on ' +
+      'top of everything above; where it changes the look or layout, it replaces the defaults ' +
+      'above. The required output contract above (element IDs, widget config, postMessage ' +
+      'listener, single HTML document) always wins.\n\n' +
+      directive
+    : prompts.system;
+
   log.info(`Generating ${widgetType} widget for: ${outline.title}`);
-  const response = await aiCall(prompts.system, prompts.user);
-  const html = extractHtml(response, log);
+  const response = await aiCall(system, prompts.user);
+  let html = extractHtml(response, log);
 
   if (!html) {
     log.error(`Failed to extract HTML from ${widgetType} response for: ${outline.title}`);
     options.onFailure?.({ code: 'invalid-model-output' });
     return null;
+  }
+
+  if (options.reviewInteractive) {
+    html = await reviewAndRepairWidget(html, {
+      system,
+      userPrompt: prompts.user,
+      title: outline.title,
+      widgetType,
+      aiCall,
+      review: options.reviewInteractive,
+      repair: options.repairInteractive,
+      // Fork: without skill guidance, keep the standard upstream look and fix
+      // real faults only (see reviewAndRepairWidget).
+      faultsOnly: !directive,
+      log,
+    });
   }
 
   // Extract widget config from HTML if present
@@ -1286,6 +1372,104 @@ export async function generateWidgetContent(
     widgetType,
     widgetConfig,
   };
+}
+
+/**
+ * Fork: render-check a generated widget and, when the review finds problems,
+ * ask the model for ONE corrected version. Any failure along the way keeps the
+ * original page: review is an improvement, never a reason to lose a page.
+ */
+async function reviewAndRepairWidget(
+  html: string,
+  ctx: {
+    system: string;
+    userPrompt: string;
+    title: string;
+    widgetType: string;
+    aiCall: AICallFn;
+    review: InteractiveReviewFn;
+    repair?: InteractiveRepairFn;
+    /**
+     * True when no skill guidance shaped the page: layout findings (scrolling,
+     * spacing, contrast, small text) are ignored and only blocking faults are
+     * repaired, with a full rewrite. The visual style stays upstream's.
+     */
+    faultsOnly?: boolean;
+    log: GenerationLogger;
+  },
+): Promise<string> {
+  const meta = { title: ctx.title, widgetType: ctx.widgetType };
+  const check = async (page: string): Promise<InteractiveReview | null> => {
+    try {
+      return await ctx.review(page, meta);
+    } catch (error) {
+      ctx.log.warn(`Interactive review failed for "${ctx.title}"; keeping the page`, error);
+      return null;
+    }
+  };
+
+  let first = await check(html);
+  if (!first || first.issues.length === 0) return html;
+  if (ctx.faultsOnly) {
+    const blocking = first.blockingIssues ?? (first.needsRewrite ? first.issues : []);
+    if (blocking.length === 0) {
+      ctx.log.info(
+        `Interactive review: ${first.issues.length} layout note(s) in "${ctx.title}" left as is (no skill guidance)`,
+      );
+      return html;
+    }
+    first = { ...first, issues: blocking, needsRewrite: true, score: undefined };
+  }
+
+  // ONE repair: a fast patch for layout problems, a full rewrite only when a
+  // patch cannot help. Re-checked, and kept only if it is not worse.
+  const patch = !first.needsRewrite && ctx.repair;
+  ctx.log.info(
+    `Interactive review found ${first.issues.length} issue(s) in "${ctx.title}"; ` +
+      (patch ? 'patching' : 'rewriting'),
+  );
+  let repaired: string | null = null;
+  try {
+    repaired = patch
+      ? await ctx.repair!(html, first, meta)
+      : extractHtml(
+          await ctx.aiCall(
+            ctx.system,
+            [
+              ctx.userPrompt,
+              '',
+              '---',
+              '',
+              'You already generated the page below. It was rendered in a real browser at the stage',
+              'size and checked automatically. Fix EVERY problem listed, keep everything that works',
+              '(content, element IDs, widget config, postMessage listener), and return the complete',
+              'corrected HTML document only.',
+              '',
+              '## Problems found',
+              ...first.issues.map((issue) => `- ${issue}`),
+              '',
+              first.screenshot ? 'A screenshot of the page as rendered is attached.' : '',
+              '',
+              '## Your previous HTML',
+              '',
+              html,
+            ].join('\n'),
+            first.screenshot ? [{ id: 'qa-screenshot', src: first.screenshot }] : undefined,
+          ),
+          ctx.log,
+        );
+  } catch (error) {
+    ctx.log.warn(`Repair failed for "${ctx.title}"; keeping the original`, error);
+    return html;
+  }
+  if (!repaired) return html;
+  const after = await check(repaired);
+  if (!after) return repaired; // could not re-check: trust the repair
+  const weight = (r: InteractiveReview) =>
+    ctx.faultsOnly
+      ? (r.blockingIssues ?? (r.needsRewrite ? r.issues : [])).length
+      : (r.score ?? r.issues.length);
+  return weight(after) <= weight(first) ? repaired : html;
 }
 
 /**

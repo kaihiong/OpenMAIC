@@ -22,6 +22,7 @@ import {
   checkOutlineAgainstSkill,
   checkScenesAgainstSkill,
   createNativeSkillReadTool,
+  combineWidgetCraft,
   findSkill,
   listSkills,
   skillInvocationPrompt,
@@ -1400,5 +1401,58 @@ describe('listSkills loads all built-in skills via normalizing env', () => {
       expect(s.content.length).toBeGreaterThan(0);
       expect(s.id).toBeTruthy();
     }
+  });
+});
+
+describe('immersive-interactive widget craft (fork)', () => {
+  it('loads widget-craft.md as build guidance for interactive pages', async () => {
+    const skill = (await listSkills()).find((s) => s.id === 'immersive-interactive');
+    expect(skill?.widgetCraft).toContain('Three.js');
+    expect(skill?.constraints?.allowedWidgetTypes).toContain('visualization3d');
+  });
+
+  it('marks NIE-made skills with publisher NIE and leaves upstream skills unmarked', async () => {
+    const skills = await listSkills();
+    expect(skills.find((s) => s.id === 'immersive-interactive')?.publisher).toBe('NIE');
+    expect(skills.find((s) => s.id === 'deep-interactive')?.publisher).toBeUndefined();
+  });
+
+  it('only the NIE skills carry widget craft', async () => {
+    const carriers = (await listSkills()).filter((s) => s.widgetCraft).map((s) => s.id);
+    expect(carriers.sort()).toEqual(['immersive-interactive', 'nie-design']);
+  });
+
+  it('nie-design carries the NIE-branded design and is published by NIE', async () => {
+    const skill = (await listSkills()).find((s) => s.id === 'nie-design');
+    expect(skill?.publisher).toBe('NIE');
+    expect(skill?.widgetCraft).toContain('#0047B6');
+    expect(skill?.widgetCraft).toContain('tricolour');
+    expect(skill?.constraints).toBeNull();
+  });
+
+  it('combines several skills, design first, each labelled', async () => {
+    const skills = await listSkills();
+    const immersive = skills.find((s) => s.id === 'immersive-interactive')!;
+    const design = skills.find((s) => s.id === 'nie-design')!;
+    const combined = combineWidgetCraft([immersive, design])!;
+    expect(combined.indexOf('<!-- skill: /nie-design -->')).toBe(0);
+    expect(combined).toContain('<!-- skill: /immersive-interactive -->');
+    expect(combineWidgetCraft([skills.find((s) => s.id === 'deep-interactive')!])).toBeUndefined();
+  });
+
+  it('immersive guidance no longer prescribes Explore / Predict / Challenge modes', async () => {
+    const skill = (await listSkills()).find((s) => s.id === 'immersive-interactive');
+    expect(skill?.widgetCraft).not.toMatch(/Predict|Challenge mode/);
+  });
+});
+
+describe('course language fallback (fork)', () => {
+  it('uses the course directive when present and a same-language fallback otherwise', async () => {
+    const { courseLanguageDirective, FALLBACK_LANGUAGE_DIRECTIVE } = await import(
+      '@/lib/server/agent-runtime/generation-tools'
+    );
+    expect(courseLanguageDirective('Teach in English.')).toBe('Teach in English.');
+    expect(courseLanguageDirective(undefined)).toBe(FALLBACK_LANGUAGE_DIRECTIVE);
+    expect(courseLanguageDirective('  ')).toBe(FALLBACK_LANGUAGE_DIRECTIVE);
   });
 });

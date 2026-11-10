@@ -34,6 +34,7 @@
  * keeps its copy because the hero only exists on this resting surface.
  */
 
+import { WelcomeNotice } from '@/components/welcome-notice';
 import { type ReactNode, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
@@ -157,10 +158,19 @@ export function WorkspaceHome({
             </div>
 
             <div className="mt-3.5 flex items-center gap-3">
-              <p className="ws-tagline" data-testid="pro-workspace-hero-tagline">
+              <p
+                className="ws-tagline"
+                data-testid="pro-workspace-hero-tagline"
+                data-pro-morph="tagline"
+              >
                 {t('home.slogan')}
               </p>
             </div>
+          </div>
+
+          {/* Fork: the NIE welcome notice, with the way back to classic mode. */}
+          <div className={cn('mt-6 flex w-full justify-center', !swapped && 'ws-enter ws-d1')}>
+            <WelcomeNotice modeSwitch={{ direction: 'back', onClick: onExitPro }} />
           </div>
 
           {/* Beat two: the composer, the one object on this page with real

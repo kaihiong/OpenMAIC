@@ -30,6 +30,7 @@ import { toGenerationContent } from './generation-content';
 import { checkScenesAgainstSkill } from './skills';
 import { isMediaPlaceholder } from '@/lib/store/media-generation';
 import { createLogger } from '@/lib/logger';
+import { interactiveReviewOption } from '@/lib/server/interactive-qa/review';
 
 const MAX_GENERATE_SCENE_MEDIA = 8;
 const SUPPORTED_SCENE_TYPES = new Set(['slide', 'quiz', 'interactive', 'pbl']);
@@ -217,6 +218,22 @@ function actionContext(scenes: readonly Scene[], current: Scene): SceneGeneratio
 }
 
 /** Drop action names unknown to the current DSL before they reach persistence. */
+/**
+ * Fork: Pro courses are created without a `languageDirective` (classic mode's
+ * outline step writes one). With an empty directive the page generators guess
+ * the language, and the Chinese-authored upstream prompts pull them towards
+ * Chinese labels in English courses. Fall back to the language the agent
+ * already wrote the page in.
+ */
+export const FALLBACK_LANGUAGE_DIRECTIVE =
+  'Write every learner-facing word (on-screen titles, labels, buttons, hints, feedback and ' +
+  "narration) in the same language as this page's title and brief, which follow the " +
+  "teacher's request. Do not switch or mix languages.";
+
+export function courseLanguageDirective(directive: string | undefined): string {
+  return directive?.trim() ? directive : FALLBACK_LANGUAGE_DIRECTIVE;
+}
+
 export function filterKnownActions(actions: readonly Action[]): Action[] {
   return actions.filter((action) => isActionType(action.type));
 }
@@ -385,9 +402,13 @@ export function buildGenerationTools(deps: GenerationToolDeps): AgentTool<never,
       let contentFailure: SceneContentFailureCode | undefined;
       try {
         content = await generateSceneContent(outline, aiCallFor(sceneContentStage(params.type)), {
+          ...interactiveReviewOption(),
           agents,
-          languageDirective: doc.stage.languageDirective ?? '',
+          languageDirective: courseLanguageDirective(doc.stage.languageDirective),
           allowProceduralSkill: true,
+          ...(params.type === 'interactive' && deps.getWidgetCraft?.()
+            ? { widgetDirective: deps.getWidgetCraft() }
+            : {}),
           ...(assignedImages.length ? { assignedImages, imageMapping } : {}),
           ...(params.instruction ? { editDirective: params.instruction } : {}),
           ...(baseline ? { baselineContent: baseline } : {}),
@@ -444,7 +465,7 @@ export function buildGenerationTools(deps: GenerationToolDeps): AgentTool<never,
       const actions = filterKnownActions(
         await actionGenerator(outline, content, aiCallFor('scene-actions'), {
           agents,
-          languageDirective: doc.stage.languageDirective ?? '',
+          languageDirective: courseLanguageDirective(doc.stage.languageDirective),
         }),
       );
       const built = buildCompleteScene(outline, content, actions, params.stageId, {
@@ -530,7 +551,7 @@ export function buildGenerationTools(deps: GenerationToolDeps): AgentTool<never,
           {
             ctx: actionContext(doc.scenes, scene),
             agents: doc.stage.generatedAgentConfigs,
-            languageDirective: doc.stage.languageDirective ?? '',
+            languageDirective: courseLanguageDirective(doc.stage.languageDirective),
             userProfile: params.styleDirective,
           },
         ),

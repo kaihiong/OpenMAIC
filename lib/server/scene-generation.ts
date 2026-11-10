@@ -23,6 +23,7 @@ import { createLogger } from '@/lib/logger';
 import { generatePBLV2Project } from '@/lib/pbl/v2/agents/planner';
 import type { Action } from '@/lib/types/action';
 import type { Scene, SceneContent } from '@/lib/types/stage';
+import { interactiveReviewOption } from '@/lib/server/interactive-qa/review';
 
 const log = createLogger('Generation');
 
@@ -69,6 +70,7 @@ export async function buildSceneFromOutline(
 
   onPhaseChange?.('content');
   const content = await generateSceneContent(safeOutline, aiCall, {
+    ...interactiveReviewOption(),
     assignedImages,
     imageMapping,
     visionEnabled,

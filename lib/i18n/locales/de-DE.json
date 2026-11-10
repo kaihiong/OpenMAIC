@@ -11,7 +11,18 @@
   },
   "home": {
     "slogan": "Generatives Lernen im interaktiven Lernraum mit mehreren KI-Agenten",
-    "greetingWithName": "Hallo, {{name}}"
+    "greetingWithName": "Hallo, {{name}}",
+    "welcome": {
+      "title": "Willkommen bei OpenMAIC! Schön, dass du da bist.",
+      "environment": "Diese Version läuft in der NIE-Umgebung. Damit alle geschützt bleiben, lade bitte nur Materialien hoch, die höchstens als „Confidential“ (vertraulich) eingestuft sind, und keine personenbezogenen Daten.",
+      "supportPrefix": "Funktioniert etwas nicht? Schreib uns einfach an",
+      "supportSuffix": ".",
+      "proPrompt": "Möchtest du einen Kurs Schritt für Schritt mit einem KI-Assistenten aufbauen und verfeinern?",
+      "enterPro": "Pro-Modus öffnen",
+      "classicPrompt": "Lieber eine ganze Lektion in einem Schritt erstellen?",
+      "backToClassic": "Zurück zum klassischen Modus",
+      "signOff": "Viel Freude beim Lehren und Lernen!"
+    }
   },
   "toolbar": {
     "pdfParser": "Parser",
@@ -1758,7 +1769,7 @@
     "selectAgents": "Agenten auswählen",
     "noVisionWarning": "Das aktuelle Modell unterstützt keine Bildverarbeitung. Bilder können weiterhin in Folien eingefügt werden, aber das Modell kann den Bildinhalt nicht verstehen, um Auswahl und Layout zu optimieren",
     "serverConfigured": "Server",
-    "serverConfiguredNotice": "Dieser Anbieter wird vom Server verwaltet und kann hier nicht bearbeitet werden. Um eigene Zugangsdaten zu verwenden, füge einen separaten Anbieter hinzu.",
+    "serverConfiguredNotice": "Dieser Anbieter wird vom Server verwaltet und kann hier nicht bearbeitet werden.",
     "ttsProviderEnabledLabel": "Diesen Anbieter aktivieren",
     "ttsProviderEnabledHint": "Wenn deaktiviert, wird dieser Anbieter in der Stimmauswahl ausgeblendet und nie automatisch zugewiesen.",
     "ttsProviderUnavailableHint": "Konfiguriere diesen Anbieter, bevor du ihn aktivierst.",

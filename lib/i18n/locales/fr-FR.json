@@ -11,7 +11,18 @@
   },
   "home": {
     "slogan": "L’apprentissage génératif en classe interactive multi-agents",
-    "greetingWithName": "Bonjour, {{name}}"
+    "greetingWithName": "Bonjour, {{name}}",
+    "welcome": {
+      "title": "Bienvenue sur OpenMAIC ! Nous sommes ravis de vous accueillir.",
+      "environment": "Cette version fonctionne dans l’environnement du NIE. Pour la sécurité de tous, veuillez n’importer que des documents classés « Confidential » (confidentiel) ou moins, et aucune donnée personnelle.",
+      "supportPrefix": "Un souci ? Écrivez-nous simplement à",
+      "supportSuffix": ".",
+      "proPrompt": "Envie de construire et d’affiner un cours étape par étape avec un assistant IA ?",
+      "enterPro": "Passer en mode Pro",
+      "classicPrompt": "Vous préférez créer une leçon complète en une seule fois ?",
+      "backToClassic": "Revenir au mode classique",
+      "signOff": "Bon enseignement et bon apprentissage !"
+    }
   },
   "toolbar": {
     "pdfParser": "Analyseur",
@@ -1758,7 +1769,7 @@
     "selectAgents": "Choisir les agents",
     "noVisionWarning": "Le modèle actuel ne prend pas en charge la vision. Les images peuvent toujours être placées dans les diapositives, mais le modèle ne peut pas en comprendre le contenu pour en optimiser le choix et la mise en page",
     "serverConfigured": "Serveur",
-    "serverConfiguredNotice": "Ce fournisseur est géré par le serveur et ne peut pas être modifié ici. Pour utiliser vos propres identifiants, ajoutez un fournisseur distinct.",
+    "serverConfiguredNotice": "Ce fournisseur est géré par le serveur et ne peut pas être modifié ici.",
     "ttsProviderEnabledLabel": "Activer ce fournisseur",
     "ttsProviderEnabledHint": "Lorsqu’il est désactivé, ce fournisseur est masqué du sélecteur de voix et n’est jamais attribué automatiquement.",
     "ttsProviderUnavailableHint": "Configurez ce fournisseur avant de l’activer.",

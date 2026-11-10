@@ -151,6 +151,8 @@ export const LLM_STAGES = [
   'maic-agent',
   'maic-agent-driver',
   'conversation-title',
+  // Fork: the fast CSS patch for interactive pages that fail the visual review.
+  'interactive-repair',
 ] as const;
 
 export type LlmStage = (typeof LLM_STAGES)[number];

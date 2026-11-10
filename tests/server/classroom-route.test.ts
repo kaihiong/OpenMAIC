@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { UUID_PATTERN } from '@/lib/utils/course-id';
 import { NextRequest } from 'next/server';
 
 // POST /api/classroom must choose the storage id itself instead of trusting the
@@ -30,7 +31,8 @@ vi.mock('@/lib/logger', () => ({
   }),
 }));
 
-const SERVER_ID_PATTERN = /^[A-Za-z0-9_-]{10}$/;
+// Fork: server-generated course ids are UUIDs.
+const SERVER_ID_PATTERN = UUID_PATTERN;
 
 function postClassroom(stage: Record<string, unknown>, scenes: unknown[] = []) {
   const request = new NextRequest('http://localhost/api/classroom', {

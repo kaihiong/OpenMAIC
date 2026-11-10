@@ -11,7 +11,18 @@
   },
   "home": {
     "slogan": "マルチエージェント対話型教室で生成的に学ぶ",
-    "greetingWithName": "こんにちは、{{name}}さん"
+    "greetingWithName": "こんにちは、{{name}}さん",
+    "welcome": {
+      "title": "OpenMAIC へようこそ！ご利用いただきありがとうございます。",
+      "environment": "このバージョンは NIE の環境内で運用されています。安全のため、アップロードする資料は「Confidential（機密）」以下の区分のものに限り、個人情報は含めないでください。",
+      "supportPrefix": "うまく動かないときは、",
+      "supportSuffix": " までお気軽にご連絡ください。",
+      "proPrompt": "AI アシスタントと一緒に、コースを一歩ずつ作り込みたいですか？",
+      "enterPro": "プロモードを開く",
+      "classicPrompt": "レッスン全体を一度に作成したいですか？",
+      "backToClassic": "クラシックモードに戻る",
+      "signOff": "楽しい授業と学びを！"
+    }
   },
   "toolbar": {
     "pdfParser": "パーサー",
@@ -1759,7 +1770,7 @@
     "selectAgents": "エージェントを選択",
     "noVisionWarning": "現在のモデルは画像認識に対応していません。スライドに画像を配置することは可能ですが、モデルは画像の内容を理解して選択やレイアウトを最適化することができません",
     "serverConfigured": "サーバー",
-    "serverConfiguredNotice": "このプロバイダーはサーバーで管理されており、ここでは編集できません。独自の認証情報を使うには、別のプロバイダーを追加してください。",
+    "serverConfiguredNotice": "このプロバイダーはサーバーで管理されており、ここでは編集できません。",
     "ttsProviderEnabledLabel": "このプロバイダーを有効化",
     "ttsProviderEnabledHint": "オフにすると、このプロバイダーは音声選択に表示されず、自動割り当てもされません。",
     "ttsProviderUnavailableHint": "有効化する前にこのプロバイダーを設定してください。",

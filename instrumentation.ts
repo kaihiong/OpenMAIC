@@ -5,6 +5,9 @@
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    await import('./instrumentation.node');
+    // Fork fix: importing the module is not enough; its `register` installs the
+    // agent runner, material extraction, asset collector and config checks.
+    const { register: registerNode } = await import('./instrumentation.node');
+    await registerNode();
   }
 }

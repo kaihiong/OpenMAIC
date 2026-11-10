@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils/cn';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { uploadWorkbenchMaterial, type WorkbenchMaterial } from '@/lib/workbench/session-store';
 import { skillTitle, useAgentSkills, type AgentSkillInfo } from '@/lib/workbench/agent-skills';
+import { NieSkillBadge } from '@/components/workbench/nie-skill-badge';
 import {
   createMaterialUploadIdentityGate,
   MaterialSlotLedger,
@@ -225,6 +226,7 @@ export function SkillSlashMenu({
                             >
                               /{skill.name}
                             </span>
+                            <NieSkillBadge skill={skill} className="self-center" />
                           </span>
                           <span className="line-clamp-2 text-[11px] leading-snug text-muted-foreground">
                             {skill.description}

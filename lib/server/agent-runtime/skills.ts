@@ -83,6 +83,17 @@ export interface LoadedSkill {
   content: string;
   filePath: string;
   constraints: OutlineConstraints | null;
+  /**
+   * Fork: build guidance for interactive pages (`widget-craft.md`, a sibling of
+   * SKILL.md). Builtin skills only. While a skill carrying it is in use, every
+   * interactive page `generate_scene` builds gets this text in its prompt.
+   */
+  widgetCraft?: string;
+  /**
+   * Fork: who made a builtin skill (`metadata.publisher` in its frontmatter),
+   * e.g. "NIE". Absent for upstream OpenMAIC skills and user skills.
+   */
+  publisher?: string;
   source: 'builtin' | 'user';
   /** Exact virtual SKILL.md text for database-backed skills. */
   virtualFileContent?: string;
@@ -193,6 +204,16 @@ async function listBuiltinSkills(): Promise<LoadedSkill[]> {
       }
     }
     const title = readSkillTitle(skill.filePath);
+    const publisher = readSkillPublisher(skill.filePath);
+    const widgetCraftPath = join(dirname(skill.filePath), 'widget-craft.md');
+    let widgetCraft: string | undefined;
+    if (existsSync(widgetCraftPath)) {
+      try {
+        widgetCraft = readFileSync(widgetCraftPath, 'utf8').trim() || undefined;
+      } catch (err) {
+        log.warn(`unreadable ${widgetCraftPath}: ${String(err)}`);
+      }
+    }
     return {
       id: skill.name,
       name: skill.name,
@@ -201,6 +222,8 @@ async function listBuiltinSkills(): Promise<LoadedSkill[]> {
       content: skill.content,
       filePath: skill.filePath,
       constraints,
+      ...(widgetCraft ? { widgetCraft } : {}),
+      ...(publisher ? { publisher } : {}),
       source: 'builtin' as const,
     };
   });
@@ -245,6 +268,15 @@ export async function listSkills(ownerId?: string): Promise<LoadedSkill[]> {
  * just shows its id alone.
  */
 function readSkillTitle(filePath: string): string | undefined {
+  return readSkillFrontmatterField(filePath, 'title');
+}
+
+/** Fork: `metadata.publisher` (or top-level `publisher`), e.g. "NIE". */
+function readSkillPublisher(filePath: string): string | undefined {
+  return readSkillFrontmatterField(filePath, 'publisher');
+}
+
+function readSkillFrontmatterField(filePath: string, field: string): string | undefined {
   try {
     const text = readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     if (!text.startsWith('---')) return undefined;
@@ -261,10 +293,10 @@ function readSkillTitle(filePath: string): string | undefined {
     // validator permits extension fields under `metadata`. Accept both so a
     // newly scaffolded runtime skill can pass upstream validation without
     // losing the display name this product requires.
-    const title = parsed.title ?? metadata.title;
-    return typeof title === 'string' && title.trim() ? title.trim() : undefined;
+    const value = parsed[field] ?? metadata[field];
+    return typeof value === 'string' && value.trim() ? value.trim() : undefined;
   } catch (err) {
-    log.warn(`unreadable frontmatter title in ${filePath}: ${String(err)}`);
+    log.warn(`unreadable frontmatter ${field} in ${filePath}: ${String(err)}`);
     return undefined;
   }
 }
@@ -526,6 +558,39 @@ export function readProvesCoverage(record: SkillReadRecord, currentHash: string)
  * This is the crash/deploy resume seam: activation itself is native transcript
  * state, not a parallel `skill_decided` state machine.
  */
+/**
+ * Fork: every skill read in this transcript that carries interactive build
+ * guidance (`widgetCraft`), oldest first, without repeats. Unlike the active
+ * skill, reading a guidance-free skill (stage-design, slide-craft …) clears
+ * nothing, so the guidance the teacher chose stays on for the session.
+ */
+export function widgetCraftSkillsFromTranscript(
+  messages: readonly AgentMessage[],
+  skills: readonly LoadedSkill[],
+): LoadedSkill[] {
+  const seen = new Map<string, LoadedSkill>();
+  for (const read of skillReadsInTranscript(messages, skills)) {
+    if (read.skill.widgetCraft && !seen.has(read.skill.id)) seen.set(read.skill.id, read.skill);
+  }
+  return [...seen.values()];
+}
+
+/**
+ * Fork: one directive from several skills' guidance. Design skills (look) come
+ * before the others (depth), so a depth skill's later, more specific rules read
+ * as building on the look. Undefined when no skill carries guidance.
+ */
+export function combineWidgetCraft(skills: readonly LoadedSkill[]): string | undefined {
+  const withCraft = skills.filter((skill) => skill.widgetCraft);
+  if (withCraft.length === 0) return undefined;
+  const ordered = [...withCraft].sort(
+    (a, b) => Number(!a.id.endsWith('-design')) - Number(!b.id.endsWith('-design')),
+  );
+  return ordered
+    .map((skill) => `<!-- skill: /${skill.name} -->\n${skill.widgetCraft!.trim()}`)
+    .join('\n\n');
+}
+
 export function skillReadFromTranscript(
   messages: readonly AgentMessage[],
   skills: readonly LoadedSkill[],

@@ -30,6 +30,9 @@ type _SceneContentKeys = Assert<
     | 'baselineContent'
     | 'pblLoopFallback'
     | 'onFailure'
+    | 'widgetDirective'
+    | 'reviewInteractive'
+    | 'repairInteractive'
     | 'logger'
   >
 >;

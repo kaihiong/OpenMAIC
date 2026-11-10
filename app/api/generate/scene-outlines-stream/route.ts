@@ -13,6 +13,7 @@
  *   { type: 'error', error: string }
  */
 
+import { isVideoGenerationEnabled } from '@/lib/config/feature-flags';
 import { NextRequest } from 'next/server';
 import { streamLLM } from '@/lib/ai/llm';
 import { buildPrompt, PROMPT_IDS } from '@/lib/prompts';
@@ -403,7 +404,8 @@ export async function POST(req: NextRequest) {
 
     // Build media snippet conditions based on enabled flags.
     const imageGenerationEnabled = req.headers.get('x-image-generation-enabled') === 'true';
-    const videoGenerationEnabled = req.headers.get('x-video-generation-enabled') === 'true';
+    const videoGenerationEnabled =
+      isVideoGenerationEnabled() && req.headers.get('x-video-generation-enabled') === 'true';
     const mediaGenerationEnabled = imageGenerationEnabled || videoGenerationEnabled;
     const hasSourceImages = (pdfImages?.length ?? 0) > 0;
 

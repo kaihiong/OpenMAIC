@@ -146,6 +146,7 @@
  */
 
 import { createOpenAI } from '@ai-sdk/openai';
+import { createAzure } from '@ai-sdk/azure';
 import { experimental_transcribe as transcribe } from 'ai';
 import type { ASRModelConfig } from './types';
 import { isCustomASRProvider } from './types';
@@ -389,22 +390,84 @@ async function transcribeCustomOpenAICompatibleASR(
 }
 
 /**
+ * Prepare the AI SDK's transcription upload for the provider transport:
+ *
+ * - The SDK asks for `verbose_json` from every model it does not know (it only
+ *   lists gpt-4o-transcribe / gpt-4o-mini-transcribe as JSON-only), and newer
+ *   models such as gpt-transcribe reject it. Only Whisper models need it, so
+ *   everything else is asked for plain `json`.
+ * - The transport is the npm `undici` fetch, which does not recognise Node's
+ *   built-in `FormData`, so the upload reached the provider with no file
+ *   ("body.file: Field required"). Encode it to bytes with the platform's own
+ *   encoder and carry its multipart Content-Type across.
+ */
+function prepareTranscriptionRequest(modelId: string, inner: typeof fetch): typeof fetch {
+  const isWhisper = /whisper/i.test(modelId);
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const body = init?.body;
+    if (!(body instanceof FormData)) return inner(input, init);
+    if (!isWhisper && body.get('response_format') === 'verbose_json') {
+      body.set('response_format', 'json');
+    }
+    const encoded = new Request('http://localhost/', { method: 'POST', body });
+    const headers = new Headers(init?.headers);
+    headers.set('content-type', encoded.headers.get('content-type') ?? 'multipart/form-data');
+    return inner(input, { ...init, headers, body: new Uint8Array(await encoded.arrayBuffer()) });
+  }) as typeof fetch;
+}
+
+/** api-version for Azure OpenAI per-deployment transcription calls. */
+const AZURE_TRANSCRIPTION_API_VERSION = '2025-04-01-preview';
+
+/**
+ * `https://<resource>.openai.azure.com` when `baseUrl` points at an Azure
+ * OpenAI resource (with or without `/openai` or `/openai/v1`), else undefined.
+ */
+export function azureOpenAIResourceRoot(baseUrl: string | undefined): string | undefined {
+  const match = baseUrl
+    ?.trim()
+    .match(/^(https:\/\/[a-z0-9-]+\.openai\.azure\.com)(\/openai(\/v1)?)?\/?$/i);
+  return match?.[1];
+}
+
+/**
  * OpenAI Whisper implementation (using Vercel AI SDK)
  */
 async function transcribeOpenAIWhisper(
   config: ASRModelConfig,
   audioBuffer: Buffer | Blob,
 ): Promise<ASRTranscriptionResult> {
-  const openai = createOpenAI({
-    apiKey: config.apiKey!,
-    baseURL: config.baseUrl || ASR_PROVIDERS['openai-whisper'].defaultBaseUrl,
-    // The AI SDK issues the multipart upload through this transport, so the
-    // provider request inherits the same redirect + pinned-DNS protection as
-    // the raw provider fetches.
-    fetch: createAudioProviderFetch({
-      allowLocalNetworks: config.publicOnly ? false : undefined,
-    }) as typeof fetch,
-  });
+  // Fork: Azure OpenAI serves transcription only on its per-deployment
+  // address (`/openai/deployments/<name>/audio/transcriptions?api-version=…`);
+  // the `/openai/v1` address answers DeploymentNotFound (verified 2026-11-08).
+  const azureRoot = azureOpenAIResourceRoot(config.baseUrl);
+  const modelId = config.modelId || ASR_PROVIDERS['openai-whisper'].defaultModelId;
+  const openai = azureRoot
+    ? createAzure({
+        apiKey: config.apiKey!,
+        baseURL: `${azureRoot}/openai`,
+        useDeploymentBasedUrls: true,
+        apiVersion: AZURE_TRANSCRIPTION_API_VERSION,
+        fetch: prepareTranscriptionRequest(
+          modelId,
+          createAudioProviderFetch({
+            allowLocalNetworks: config.publicOnly ? false : undefined,
+          }) as typeof fetch,
+        ),
+      })
+    : createOpenAI({
+        apiKey: config.apiKey!,
+        baseURL: config.baseUrl || ASR_PROVIDERS['openai-whisper'].defaultBaseUrl,
+        // The AI SDK issues the multipart upload through this transport, so the
+        // provider request inherits the same redirect + pinned-DNS protection as
+        // the raw provider fetches.
+        fetch: prepareTranscriptionRequest(
+          modelId,
+          createAudioProviderFetch({
+            allowLocalNetworks: config.publicOnly ? false : undefined,
+          }) as typeof fetch,
+        ),
+      });
 
   // Convert to Buffer or Uint8Array (which is required by the AI SDK)
   let audioData: Buffer | Uint8Array;
@@ -419,7 +482,7 @@ async function transcribeOpenAIWhisper(
 
   try {
     const result = await transcribe({
-      model: openai.transcription(config.modelId || ASR_PROVIDERS['openai-whisper'].defaultModelId),
+      model: openai.transcription(modelId),
       audio: audioData,
       providerOptions: {
         openai: {

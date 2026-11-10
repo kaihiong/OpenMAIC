@@ -16,6 +16,9 @@ export {
   resolveImageIds,
 } from './scene-generator.js';
 export type {
+  InteractiveRepairFn,
+  InteractiveReview,
+  InteractiveReviewFn,
   SceneActionsOptions,
   SceneContentFailure,
   SceneContentFailureCode,

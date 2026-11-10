@@ -1,4 +1,5 @@
 import { callLLM } from '@/lib/ai/llm';
+import { isVideoGenerationEnabled } from '@/lib/config/feature-flags';
 import { createStageAPI } from '@/lib/api/stage-api';
 import type { StageStore } from '@/lib/api/stage-api-types';
 import {
@@ -42,6 +43,7 @@ import { buildVideoManifestFromOutlines } from '@/lib/media/video-manifest';
 import type { UserRequirements } from '@/lib/types/generation';
 import type { Scene, Stage } from '@/lib/types/stage';
 import { AGENT_COLOR_PALETTE, AGENT_DEFAULT_AVATARS } from '@/lib/constants/agent-defaults';
+import { interactiveReviewOption } from '@/lib/server/interactive-qa/review';
 
 const log = createLogger('Classroom');
 
@@ -521,7 +523,7 @@ export async function generateClassroom(
     aiCall,
     {
       imageGenerationEnabled: input.enableImageGeneration,
-      videoGenerationEnabled: input.enableVideoGeneration,
+      videoGenerationEnabled: isVideoGenerationEnabled() && input.enableVideoGeneration,
       researchContext,
       // NO teacherContext — agents haven't been generated yet
     },
@@ -642,6 +644,7 @@ export async function generateClassroom(
           return await withGenerationRetry(
             () =>
               generateSceneContent(safeOutline, contentCall.aiCall, {
+                ...interactiveReviewOption(),
                 agents,
                 languageDirective,
                 allowProceduralSkill: vocationalActive,

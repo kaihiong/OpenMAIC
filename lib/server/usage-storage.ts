@@ -1,6 +1,9 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { createLogger } from '@/lib/logger';
+import { adminQuery, isAdminDatabaseConfigured } from '@/lib/server/admin/db';
+import { AUTHENTICATED_OWNER_HEADER } from '@/lib/server/agent-runtime/owner-header';
 import { hasBillableTokens, type NormalizedUsage } from '@/lib/usage/normalize';
 
 const log = createLogger('UsageStorage');
@@ -36,12 +39,16 @@ export interface UsageRecordInput {
   quantity?: number;
   /** Unit for `quantity`. */
   unit?: UsageUnit;
+  /** Fork: who made the request; resolved automatically when omitted. */
+  ownerId?: string;
 }
 
 /** A persisted usage row — pure usage, no cost. */
 export interface UsageRecord {
   id: string;
   createdAt: number;
+  /** Fork: signed-in owner (`nie:<userId>`); absent on legacy/anonymous rows. */
+  ownerId?: string;
   kind: UsageKind;
   source: string;
   providerId: string;
@@ -79,6 +86,65 @@ const ZERO_USAGE: NormalizedUsage = {
 };
 
 /**
+ * Fork: who to attribute usage to when there is no web request (the Pro
+ * workspace agent runner). The runner wraps each session in this.
+ */
+const usageOwnerContext = new AsyncLocalStorage<string>();
+
+export function runWithUsageOwner<T>(ownerId: string, fn: () => T): T {
+  return usageOwnerContext.run(ownerId, fn);
+}
+
+/** Explicit owner > runner context > the signed-in user of the current request. */
+async function resolveUsageOwner(explicit?: string): Promise<string | undefined> {
+  if (explicit) return explicit;
+  const fromRunner = usageOwnerContext.getStore();
+  if (fromRunner) return fromRunner;
+  try {
+    const { headers } = await import('next/headers');
+    const owner = (await headers()).get(AUTHENTICATED_OWNER_HEADER)?.trim();
+    return owner || undefined;
+  } catch {
+    return undefined; // outside a request scope
+  }
+}
+
+async function insertUsageRow(record: UsageRecord): Promise<void> {
+  await adminQuery(
+    `INSERT INTO openmaic_usage (id, created_at, owner_id, kind, source, provider_id, model_id,
+       model_string, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
+       reasoning_tokens, quantity, unit)
+     VALUES ($1, to_timestamp($2 / 1000.0), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+     ON CONFLICT (id) DO NOTHING`,
+    [
+      record.id,
+      record.createdAt,
+      record.ownerId ?? null,
+      record.kind,
+      record.source,
+      record.providerId,
+      record.modelId,
+      record.modelString,
+      record.inputTokens,
+      record.outputTokens,
+      record.cacheReadTokens,
+      record.cacheCreationTokens,
+      record.reasoningTokens,
+      record.quantity ?? null,
+      record.unit ?? null,
+    ],
+  );
+  // Fork: "last active" for the admin Users page = the latest AI request.
+  if (record.ownerId) {
+    await adminQuery(
+      `UPDATE openmaic_users SET last_active_at = to_timestamp($2 / 1000.0)
+        WHERE owner_id = $1 AND (last_active_at IS NULL OR last_active_at < to_timestamp($2 / 1000.0))`,
+      [record.ownerId, record.createdAt],
+    );
+  }
+}
+
+/**
  * Records one generation's usage as a jsonl line. Fire-and-forget: never throws —
  * a logging failure must not break generation.
  *
@@ -110,9 +176,11 @@ export async function recordUsage(
     }
 
     const now = opts.now ?? new Date();
+    const ownerId = await resolveUsageOwner(input.ownerId);
     const record: UsageRecord = {
       id: makeId(now),
       createdAt: now.getTime(),
+      ...(ownerId ? { ownerId } : {}),
       kind,
       source: input.source,
       providerId: input.providerId,
@@ -127,6 +195,11 @@ export async function recordUsage(
       ...(input.unit ? { unit: input.unit } : {}),
     };
 
+    // Fork: Postgres when available (container files vanish on redeploy).
+    if (!opts.baseDir && isAdminDatabaseConfigured()) {
+      await insertUsageRow(record);
+      return;
+    }
     const dir = usageDir(opts.baseDir);
     await fs.mkdir(dir, { recursive: true });
     await fs.appendFile(monthlyFile(dir, now), JSON.stringify(record) + '\n', 'utf-8');
@@ -168,6 +241,76 @@ interface ReadOptions {
   baseDir?: string;
   /** Limit to specific YYYY-MM month files; defaults to all files in the dir. */
   months?: string[];
+  /** Fork: only this owner's rows (undefined = everyone). */
+  ownerId?: string;
+  /** Fork: only rows at or after this instant (epoch ms). */
+  since?: number;
+  /** Fork: only rows before this instant (epoch ms). */
+  until?: number;
+}
+
+interface UsageRow extends Record<string, unknown> {
+  id: string;
+  created_ms: string | number;
+  owner_id: string | null;
+  kind: UsageKind;
+  source: string;
+  provider_id: string;
+  model_id: string;
+  model_string: string;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_creation_tokens: number;
+  reasoning_tokens: number;
+  quantity: number | null;
+  unit: UsageUnit | null;
+}
+
+async function readUsageRows(opts: ReadOptions): Promise<UsageRecord[]> {
+  const where: string[] = [];
+  const values: unknown[] = [];
+  if (opts.ownerId) {
+    values.push(opts.ownerId);
+    where.push(`owner_id = $${values.length}`);
+  }
+  if (opts.months?.length) {
+    values.push(opts.months);
+    where.push(`to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM') = ANY($${values.length})`);
+  }
+  if (opts.since != null) {
+    values.push(opts.since);
+    where.push(`created_at >= to_timestamp($${values.length} / 1000.0)`);
+  }
+  if (opts.until != null) {
+    values.push(opts.until);
+    where.push(`created_at < to_timestamp($${values.length} / 1000.0)`);
+  }
+  const rows = await adminQuery<UsageRow>(
+    `SELECT id, (extract(epoch FROM created_at) * 1000) AS created_ms, owner_id, kind, source,
+            provider_id, model_id, model_string, input_tokens, output_tokens, cache_read_tokens,
+            cache_creation_tokens, reasoning_tokens, quantity, unit
+       FROM openmaic_usage ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+       ORDER BY created_at`,
+    values,
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    createdAt: Number(r.created_ms),
+    ...(r.owner_id ? { ownerId: r.owner_id } : {}),
+    kind: r.kind,
+    source: r.source,
+    providerId: r.provider_id,
+    modelId: r.model_id,
+    modelString: r.model_string,
+    inputTokens: r.input_tokens,
+    outputTokens: r.output_tokens,
+    cacheReadTokens: r.cache_read_tokens,
+    cacheCreationTokens: r.cache_creation_tokens,
+    reasoningTokens: r.reasoning_tokens,
+    ...(r.quantity != null ? { quantity: r.quantity } : {}),
+    ...(r.unit ? { unit: r.unit } : {}),
+  }));
 }
 
 /**
@@ -176,6 +319,7 @@ interface ReadOptions {
  * 'llm'; any legacy cost fields are simply ignored.
  */
 export async function readUsageRecords(opts: ReadOptions = {}): Promise<UsageRecord[]> {
+  if (!opts.baseDir && isAdminDatabaseConfigured()) return readUsageRows(opts);
   const dir = usageDir(opts.baseDir);
   let files: string[];
   try {
@@ -201,6 +345,9 @@ export async function readUsageRecords(opts: ReadOptions = {}): Promise<UsageRec
       try {
         const row = JSON.parse(trimmed) as UsageRecord;
         if (!row.kind) row.kind = 'llm'; // backward-compat
+        if (opts.ownerId && row.ownerId !== opts.ownerId) continue;
+        if (opts.since != null && row.createdAt < opts.since) continue;
+        if (opts.until != null && row.createdAt >= opts.until) continue;
         records.push(row);
       } catch {
         // skip malformed line

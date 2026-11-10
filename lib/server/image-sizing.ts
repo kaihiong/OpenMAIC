@@ -77,8 +77,12 @@ export function resolveImageSize<T extends ImageGenerationOptions>(
   // and portrait dimensions. In particular, a generic 1024x576 16:9 request
   // is rejected. Keep the normalization model-scoped so providers with
   // arbitrary-size APIs retain the requested aspect ratio.
+  // Fork: Azure OpenAI serves the same GPT Image models (gpt-image-2, and the
+  // 2.5 Flare/Sunburst deployments) and rejects the same sizes, e.g. 1024x576
+  // is "below the current minimum pixel budget" (verified 2026-11-08).
   if (
-    constraints?.providerId === 'openai-image' &&
+    (constraints?.providerId === 'openai-image' ||
+      constraints?.providerId === 'azure-openai-image') &&
     constraints.modelId?.startsWith('gpt-image-2')
   ) {
     const requestedWidth = resolved.width || DEFAULT_IMAGE_EDGE;

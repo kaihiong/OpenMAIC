@@ -15,6 +15,7 @@
  *  - read_stage_outline renders the outline/scene UNION view (planned pages
  *    while generation is incomplete, pure scenes once complete).
  */
+import { UUID_PATTERN } from '@/lib/utils/course-id';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
 import { ensureAssetSchema } from '@openmaic/storage/asset/pg';
@@ -224,7 +225,8 @@ describe('create_stage', () => {
     });
 
     expect(result.isError).toBeUndefined();
-    expect(result.details?.url).toMatch(/^\/classroom\/stage-/);
+    // Fork: course ids are UUIDs.
+    expect(result.details?.url).toMatch(/^\/classroom\/[0-9a-f-]{36}$/);
     expect(result.details?.title).toBe('Day 1 — Python');
 
     const doc = (
@@ -319,7 +321,7 @@ describe('create_stage', () => {
     expect(b.isError).toBeUndefined();
     expect(a.details?.stageId).not.toBe(b.details?.stageId);
     expect(store.docs.size).toBe(2);
-    expect(a.details?.stageId).toMatch(/^stage-[A-Za-z0-9_-]{10}$/);
+    expect(a.details?.stageId).toMatch(UUID_PATTERN);
   });
 
   it('refuses to confirm a stage at the derived id that this session did NOT mint', async () => {

@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { resolveASRProviderName } from '@/lib/audio/provider-display';
 import { useSettingsStore } from '@/lib/store/settings';
+import { isVideoGenerationEnabled } from '@/lib/config/feature-flags';
 import { IMAGE_PROVIDERS } from '@/lib/media/image-providers';
 import { VIDEO_PROVIDERS } from '@/lib/media/video-providers';
 import { CUSTOM_ASR_DEFAULT_LANGUAGES } from '@/lib/audio/constants';
@@ -43,6 +44,7 @@ interface MediaPopoverProps {
 const IMAGE_PROVIDER_ICONS: Record<string, string> = {
   seedream: '/logos/doubao.svg',
   'openai-image': '/logos/openai.svg',
+  'azure-openai-image': '/logos/azure.svg',
   'qwen-image': '/logos/bailian.svg',
   'nano-banana': '/logos/gemini.svg',
   'grok-image': '/logos/grok.svg',
@@ -85,6 +87,7 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
   const videoGenerationEnabled = useSettingsStore((s) => s.videoGenerationEnabled);
   const ttsEnabled = useSettingsStore((s) => s.ttsEnabled);
   const asrEnabled = useSettingsStore((s) => s.asrEnabled);
+  const serverProvidersOnly = useSettingsStore((s) => s.serverProvidersOnly);
   const setImageGenerationEnabled = useSettingsStore((s) => s.setImageGenerationEnabled);
   const setVideoGenerationEnabled = useSettingsStore((s) => s.setVideoGenerationEnabled);
   const setTTSEnabled = useSettingsStore((s) => s.setTTSEnabled);
@@ -149,6 +152,7 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
     () =>
       Object.values(IMAGE_PROVIDERS)
         .filter((p) => cfgOk(imageProvidersConfig, p.id, p.requiresApiKey))
+        .filter((p) => !serverProvidersOnly || imageProvidersConfig[p.id]?.isServerConfigured)
         .map((p) => {
           const items =
             p.id === 'comfyui-image'
@@ -157,7 +161,7 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
 
           return {
             groupId: p.id,
-            groupName: p.name,
+            groupName: imageProvidersConfig[p.id]?.serverDisplayName || p.name,
             groupIcon: IMAGE_PROVIDER_ICONS[p.id],
             available: true,
             // Map to a consistent format here
@@ -167,7 +171,7 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
             })),
           };
         }),
-    [cfgOk, imageProvidersConfig, comfyWorkflows],
+    [cfgOk, imageProvidersConfig, comfyWorkflows, serverProvidersOnly],
   );
 
   const videoGroups = useMemo(
@@ -257,7 +261,7 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
         {/* ── Tab bar (segmented control) ── */}
         <div className="p-2 pb-0">
           <div className="flex gap-0.5 p-0.5 bg-muted/60 rounded-lg">
-            {TABS.map((tab) => {
+            {TABS.filter((tab) => tab.id !== 'video' || isVideoGenerationEnabled()).map((tab) => {
               const isActive = activeTab === tab.id;
               const isEnabled = enabledMap[tab.id];
               const Icon = tab.icon;

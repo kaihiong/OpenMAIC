@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { recordSignIn } from '@/lib/server/admin/users';
 import { signJWT, COOKIE_NAME } from '@/lib/auth/jwt';
 import { sessionCookieOptions } from '@/lib/auth/session-cookie';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
@@ -38,12 +39,21 @@ export async function POST(req: Request) {
       return apiError('UNAUTHORIZED', 401, 'Invalid username or password');
     }
 
-    const token = await signJWT({
+    // Fork: courses and sessions are owned by this id, so a session without
+    // one would share an owner with every other such user. Refuse it.
+    if (!String(data.userId ?? '').trim() && !String(data.email ?? '').trim()) {
+      return apiError('UNAUTHORIZED', 401, 'Your account has no user id; contact support');
+    }
+
+    const sessionUser = {
       userId: data.userId ?? '',
       name: data.fullName ?? '',
       email: data.email ?? '',
       department: data.department ?? '',
-    });
+    };
+    const token = await signJWT(sessionUser);
+    // Fork: remember who signed in, for the admin Users page.
+    await recordSignIn(sessionUser);
 
     const cookieStore = await cookies();
     cookieStore.set(COOKIE_NAME, token, {

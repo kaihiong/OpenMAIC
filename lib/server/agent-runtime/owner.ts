@@ -1,6 +1,15 @@
 import { randomUUID } from 'node:crypto';
 
+import { AUTHENTICATED_OWNER_HEADER } from './owner-header';
+
+export { AUTHENTICATED_OWNER_HEADER, nieOwnerId } from './owner-header';
+
 const ANONYMOUS_COOKIE = 'anonymous_id';
+
+function trustedOwnerFromHeaders(headers: Headers): string | undefined {
+  const value = headers.get(AUTHENTICATED_OWNER_HEADER)?.trim();
+  return value && value.startsWith('nie:') && value.length > 4 ? value : undefined;
+}
 const ANONYMOUS_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -66,6 +75,9 @@ export function resolveRequestOwnerId(
   authenticatedOwnerId?: string,
 ): string {
   if (authenticatedOwnerId) return authenticatedOwnerId;
+  // Fork: the NIE login, verified by middleware, owns everything the user makes.
+  const signedInOwner = trustedOwnerFromHeaders(req.headers);
+  if (signedInOwner) return signedInOwner;
 
   const existingId = readCookie(req.headers, ANONYMOUS_COOKIE);
   if (existingId && UUID_V4.test(existingId)) return `anon:${existingId}`;

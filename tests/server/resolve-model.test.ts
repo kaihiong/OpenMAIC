@@ -209,6 +209,24 @@ describe('resolveModel — per-stage resolution order', () => {
     expect(r.thinkingConfig).toEqual({ effort: 'high' });
   });
 
+  it('asks the provider for the Responses API when the route sets api openai-responses (fork)', async () => {
+    process.env.MODEL_ROUTES = JSON.stringify({
+      'maic-agent-driver': { model: 'azure-openai:gpt-6-luna', api: 'openai-responses' },
+    });
+    const { resolveModel } = await import('@/lib/server/resolve-model');
+    await resolveModel({ stage: 'maic-agent-driver' });
+    expect(mocks.getModelCalls.at(-1)).toMatchObject({ responsesApi: true });
+  });
+
+  it('keeps Chat Completions for routes without the responses api (fork)', async () => {
+    process.env.MODEL_ROUTES = JSON.stringify({
+      'scene-content:interactive': 'azure-openai:gpt-6.1-sol',
+    });
+    const { resolveModel } = await import('@/lib/server/resolve-model');
+    await resolveModel({ stage: 'scene-content:interactive' });
+    expect(mocks.getModelCalls.at(-1)).not.toHaveProperty('responsesApi');
+  });
+
   it('route can pass a full thinking config (enabled + budgetTokens)', async () => {
     process.env.MODEL_ROUTES = JSON.stringify({
       'scene-content:interactive': {

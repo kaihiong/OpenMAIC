@@ -22,6 +22,7 @@ import {
   resolveVideoModel,
 } from '@/lib/server/provider-config';
 import { createLogger } from '@/lib/logger';
+import { isVideoGenerationEnabled } from '@/lib/config/feature-flags';
 import { recordGenerationUsage } from '@/lib/server/usage-storage';
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
 import { readResponseBodyWithLimit } from '@/lib/server/bounded-download';
@@ -238,6 +239,7 @@ function defaultResolveVideoProviderConfig(providerId: VideoProviderId): VideoGe
 
 /** Capability gate used before the tool enters a session's registered toolset. */
 export function hasConfiguredVideoGeneration(deps: Partial<GenerateVideoToolDeps> = {}): boolean {
+  if (!isVideoGenerationEnabled()) return false;
   const getConfigured = deps.getConfiguredVideoProviders ?? getServerVideoProviders;
   const resolveConfig = deps.resolveVideoProviderConfig ?? defaultResolveVideoProviderConfig;
   return configuredProviderIds(getConfigured()).some((providerId) => {

@@ -1002,6 +1002,25 @@ async function loadRuntimeSessions(
 }
 
 /** Persist the complete chat-session set for a stage. */
+/**
+ * Fork: drop `undefined` object members (what JSON.stringify does anyway).
+ * Tool inputs such as a spotlight's optional `dimOpacity` arrive as
+ * `undefined`; the browser store tolerated them, but the server runtime store
+ * requires plain JSON and rejected the whole chat record. Only plain objects
+ * and arrays are rebuilt; anything else is passed through untouched.
+ */
+export function withoutUndefinedMembers<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((item) => withoutUndefinedMembers(item)) as T;
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    const out: Record<string, unknown> = {};
+    for (const [key, member] of Object.entries(value as Record<string, unknown>)) {
+      if (member !== undefined) out[key] = withoutUndefinedMembers(member);
+    }
+    return out as T;
+  }
+  return value;
+}
+
 export async function saveChatSessions(
   stageId: string,
   sessions: ChatSession[],
@@ -1009,7 +1028,7 @@ export async function saveChatSessions(
 ): Promise<void> {
   const resolved = await context(options);
   const queueKey = `${stageId}\0${resolved.learnerKey}`;
-  const nextSessions = sessions ?? [];
+  const nextSessions = withoutUndefinedMembers(sessions ?? []);
   try {
     await enqueue(
       resolved.store,

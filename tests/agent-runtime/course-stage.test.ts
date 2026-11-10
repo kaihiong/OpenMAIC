@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { UUID_PATTERN } from '@/lib/utils/course-id';
 import {
   COURSE_STAGE_ID_DESCRIPTION,
   stageIdForCall,
@@ -16,7 +17,8 @@ describe('stageIdForCall', () => {
 
   it('produces a stable, prefixed id shape', () => {
     const id = stageIdForCall('session-1', 'call-1');
-    expect(id).toMatch(/^stage-[A-Za-z0-9_-]{10}$/);
+    // Fork: course ids are UUIDs (deterministic, version 8).
+    expect(id).toMatch(UUID_PATTERN);
   });
 });
 

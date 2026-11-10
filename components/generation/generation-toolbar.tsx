@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { useSettingsStore } from '@/lib/store/settings';
 import { isLLMProviderConfigured } from '@/lib/store/settings-validation';
-import { PDF_PROVIDERS } from '@/lib/pdf/constants';
+import { PDF_PROVIDERS, isPdfProviderAllowed } from '@/lib/pdf/constants';
 import type { PDFProviderId } from '@/lib/pdf/types';
 import {
   WEB_SEARCH_PROVIDERS,
@@ -86,6 +86,7 @@ export function GenerationToolbar({
 }: GenerationToolbarProps) {
   const { t } = useI18n();
   const currentProviderId = useSettingsStore((s) => s.providerId);
+  const serverProvidersOnly = useSettingsStore((s) => s.serverProvidersOnly);
   const currentModelId = useSettingsStore((s) => s.modelId);
   const providersConfig = useSettingsStore((s) => s.providersConfig);
   const setModel = useSettingsStore((s) => s.setModel);
@@ -107,8 +108,13 @@ export function GenerationToolbar({
   const selectedWebSearchAvailable = webSearchProvider
     ? isWebSearchProviderConfigured(webSearchProvider, webSearchConfig)
     : false;
-  const webSearchAvailable = Object.values(WEB_SEARCH_PROVIDERS).some((provider) =>
-    isWebSearchProviderConfigured(provider, webSearchProvidersConfig[provider.id]),
+  // Fork: in server-providers-only mode only server-managed search counts.
+  const webSearchAllowed = (id: WebSearchProviderId) =>
+    !serverProvidersOnly || !!webSearchProvidersConfig[id]?.isServerConfigured;
+  const webSearchAvailable = Object.values(WEB_SEARCH_PROVIDERS).some(
+    (provider) =>
+      webSearchAllowed(provider.id) &&
+      isWebSearchProviderConfigured(provider, webSearchProvidersConfig[provider.id]),
   );
 
   // Configured LLM providers (only those with valid credentials + models + endpoint)
@@ -300,32 +306,42 @@ export function GenerationToolbar({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.values(PDF_PROVIDERS).map((provider) => {
-                    const cfg = pdfProvidersConfig[provider.id];
-                    // AliDocMind authenticates with an AK/SK pair rather than a
-                    // single apiKey — recognize either credential shape.
-                    const hasCredentials =
-                      !!cfg?.apiKey || (!!cfg?.accessKeyId && !!cfg?.accessKeySecret);
-                    const available =
-                      !provider.requiresApiKey || hasCredentials || !!cfg?.isServerConfigured;
-                    return (
-                      <SelectItem key={provider.id} value={provider.id} disabled={!available}>
-                        <div
-                          className={cn('flex items-center gap-1.5', !available && 'opacity-50')}
-                        >
-                          {provider.icon && (
-                            <img src={provider.icon} alt={provider.name} className="w-3.5 h-3.5" />
-                          )}
-                          {provider.name}
-                          {cfg?.isServerConfigured && (
-                            <span className="text-[9px] px-1 py-0 rounded border text-muted-foreground">
-                              {t('settings.serverConfigured')}
-                            </span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
+                  {Object.values(PDF_PROVIDERS)
+                    .filter(
+                      (provider) =>
+                        !serverProvidersOnly ||
+                        isPdfProviderAllowed(provider.id, pdfProvidersConfig),
+                    )
+                    .map((provider) => {
+                      const cfg = pdfProvidersConfig[provider.id];
+                      // AliDocMind authenticates with an AK/SK pair rather than a
+                      // single apiKey — recognize either credential shape.
+                      const hasCredentials =
+                        !!cfg?.apiKey || (!!cfg?.accessKeyId && !!cfg?.accessKeySecret);
+                      const available =
+                        !provider.requiresApiKey || hasCredentials || !!cfg?.isServerConfigured;
+                      return (
+                        <SelectItem key={provider.id} value={provider.id} disabled={!available}>
+                          <div
+                            className={cn('flex items-center gap-1.5', !available && 'opacity-50')}
+                          >
+                            {provider.icon && (
+                              <img
+                                src={provider.icon}
+                                alt={provider.name}
+                                className="w-3.5 h-3.5"
+                              />
+                            )}
+                            {provider.name}
+                            {cfg?.isServerConfigured && (
+                              <span className="text-[9px] px-1 py-0 rounded border text-muted-foreground">
+                                {t('settings.serverConfigured')}
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                 </SelectContent>
               </Select>
             </div>
@@ -488,24 +504,29 @@ export function GenerationToolbar({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.values(WEB_SEARCH_PROVIDERS).map((provider) => {
-                      const cfg = webSearchProvidersConfig[provider.id];
-                      const available = isWebSearchProviderConfigured(provider, cfg);
-                      return (
-                        <SelectItem key={provider.id} value={provider.id} disabled={!available}>
-                          <div
-                            className={cn('flex items-center gap-1.5', !available && 'opacity-50')}
-                          >
-                            {getWebSearchProviderDisplayName(provider.id, t)}
-                            {cfg?.isServerConfigured && (
-                              <span className="text-[9px] px-1 py-0 rounded border text-muted-foreground">
-                                {t('settings.serverConfigured')}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
+                    {Object.values(WEB_SEARCH_PROVIDERS)
+                      .filter((provider) => webSearchAllowed(provider.id))
+                      .map((provider) => {
+                        const cfg = webSearchProvidersConfig[provider.id];
+                        const available = isWebSearchProviderConfigured(provider, cfg);
+                        return (
+                          <SelectItem key={provider.id} value={provider.id} disabled={!available}>
+                            <div
+                              className={cn(
+                                'flex items-center gap-1.5',
+                                !available && 'opacity-50',
+                              )}
+                            >
+                              {getWebSearchProviderDisplayName(provider.id, t)}
+                              {cfg?.isServerConfigured && (
+                                <span className="text-[9px] px-1 py-0 rounded border text-muted-foreground">
+                                  {t('settings.serverConfigured')}
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                   </SelectContent>
                 </Select>
               </div>

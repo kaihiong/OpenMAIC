@@ -93,11 +93,16 @@ export function ImageSettings({ selectedProviderId }: ImageSettingsProps) {
 
   const currentConfig = imageProvidersConfig[selectedProviderId];
   const currentProvider = IMAGE_PROVIDERS[selectedProviderId];
-  const builtInModels = currentProvider?.models || [];
   const customModels = useMemo(
     () => currentConfig?.customModels || [],
     [currentConfig?.customModels],
   );
+  // A server model list replaces the built-in catalogue (the same rule the
+  // model picker uses), so don't list built-ins the server did not offer.
+  const builtInModels =
+    currentConfig?.replaceBuiltInModels && customModels.length > 0
+      ? []
+      : currentProvider?.models || [];
   const isServerConfigured = !!currentConfig?.isServerConfigured;
   const requiresApiKey = currentProvider?.requiresApiKey ?? true;
 
@@ -391,10 +396,12 @@ export function ImageSettings({ selectedProviderId }: ImageSettingsProps) {
         <div className="space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <Label className="text-base">{t('settings.models')}</Label>
-            <Button variant="outline" size="sm" onClick={handleOpenAddModel} className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" />
-              {t('settings.addNewModel')}
-            </Button>
+            {!isServerConfigured && (
+              <Button variant="outline" size="sm" onClick={handleOpenAddModel} className="gap-1.5">
+                <Plus className="h-3.5 w-3.5" />
+                {t('settings.addNewModel')}
+              </Button>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -421,7 +428,7 @@ export function ImageSettings({ selectedProviderId }: ImageSettingsProps) {
                   <div className="font-mono text-sm font-medium">{model.name}</div>
                   <div className="text-xs text-muted-foreground font-mono mt-0.5">{model.id}</div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className={cn('flex items-center gap-1', isServerConfigured && 'hidden')}>
                   <Button
                     variant="outline"
                     size="sm"

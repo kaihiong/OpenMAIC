@@ -197,4 +197,10 @@ export interface ModelConfig {
    * global fetch is used. Never set by client-side consumers.
    */
   fetchImpl?: typeof fetch;
+  /**
+   * Fork: use the Responses API instead of Chat Completions where the provider
+   * supports both (Azure OpenAI). Set from a MODEL_ROUTES stage whose `api` is
+   * `openai-responses`; GPT-6 models refuse function tools on Chat Completions.
+   */
+  responsesApi?: boolean;
 }

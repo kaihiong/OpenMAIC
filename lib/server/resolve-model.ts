@@ -126,6 +126,7 @@ export async function resolveModel(params: {
     // Re-validate every redirect hop of the outbound request (see
     // fetchWithRedirectValidation); the base URL above is checked at origin.
     fetchImpl: fetchWithRedirectValidation,
+    ...(stageRoute?.api === 'openai-responses' ? { responsesApi: true } : {}),
   });
 
   // Thinking arbitration mirrors model routing — the route carries a full

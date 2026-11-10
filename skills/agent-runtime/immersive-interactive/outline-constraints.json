@@ -1,0 +1,9 @@
+{
+  "$comment": "Fork: structural constraints for the immersive-interactive skill. Same hands-on share as deep-interactive; the difference is page quality, which rides into every interactive page through widget-craft.md (see widgetCraft in lib/server/agent-runtime/skills.ts).",
+  "allowedTypes": ["slide", "quiz", "interactive"],
+  "firstSceneType": "slide",
+  "typeMix": [{ "type": "interactive", "minRatio": 0.5 }],
+  "allowedWidgetTypes": ["simulation", "diagram", "code", "game", "visualization3d"],
+  "requiredWidgetOutlineFields": ["concept"],
+  "noConsecutiveSameWidgetType": true
+}

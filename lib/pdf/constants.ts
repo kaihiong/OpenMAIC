@@ -58,3 +58,15 @@ export function getAllPDFProviders(): PDFProviderConfig[] {
 export function getPDFProvider(providerId: PDFProviderId): PDFProviderConfig | undefined {
   return PDF_PROVIDERS[providerId];
 }
+
+/**
+ * Fork: in server-providers-only mode a document parser is allowed when it is
+ * the built-in `unpdf` (runs inside this server, nothing leaves it) or when the
+ * server manages it. Hosted parsers configured only in the browser are not.
+ */
+export function isPdfProviderAllowed(
+  providerId: string,
+  configs: Partial<Record<string, { isServerConfigured?: boolean }>>,
+): boolean {
+  return providerId === 'unpdf' || !!configs[providerId]?.isServerConfigured;
+}

@@ -3,9 +3,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyJWT, COOKIE_NAME } from '@/lib/auth/jwt';
 import { isAgentRuntimeConfigured, isProWorkbenchEnabled } from '@/lib/config/feature-flags';
 import { verifyAccessTokenEdge } from '@/lib/server/access-token-edge';
+import { AUTHENTICATED_OWNER_HEADER, nieOwnerId } from '@/lib/server/agent-runtime/owner-header';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Fork: the owner header is server-controlled. Drop any client-sent copy on
+  // every request; it is re-added below only for a verified NIE session.
+  const forwardedHeaders = new Headers(request.headers);
+  forwardedHeaders.delete(AUTHENTICATED_OWNER_HEADER);
+  const next = () => NextResponse.next({ request: { headers: forwardedHeaders } });
 
   // Return an actual server-side 404 when either half of the workbench is off.
   // Edge middleware cannot reliably inspect server-only deployment variables,
@@ -19,7 +26,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Static/health always pass
-  if (pathname === '/api/health') return NextResponse.next();
+  if (pathname === '/api/health') return next();
 
   const nieAuthConfigured = !!process.env.NIE_AUTH_API_URL;
   const accessCode = process.env.ACCESS_CODE;
@@ -28,13 +35,17 @@ export async function middleware(request: NextRequest) {
   if (nieAuthConfigured) {
     // Whitelist: auth API routes and login page
     if (pathname.startsWith('/api/auth/') || pathname.startsWith('/login')) {
-      return NextResponse.next();
+      return next();
     }
 
     const token = request.cookies.get(COOKIE_NAME)?.value;
     const user = token ? await verifyJWT(token) : null;
+    const owner = user ? nieOwnerId(user) : undefined;
 
-    if (user) return NextResponse.next();
+    if (user && owner) {
+      forwardedHeaders.set(AUTHENTICATED_OWNER_HEADER, owner);
+      return next();
+    }
 
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
@@ -48,11 +59,11 @@ export async function middleware(request: NextRequest) {
 
   // --- Legacy access code mode ---
   if (accessCode) {
-    if (pathname.startsWith('/api/access-code/')) return NextResponse.next();
+    if (pathname.startsWith('/api/access-code/')) return next();
 
     const cookie = request.cookies.get('openmaic_access');
     if (cookie?.value && (await verifyAccessTokenEdge(cookie.value, accessCode))) {
-      return NextResponse.next();
+      return next();
     }
 
     // API requests without valid cookie → 401
@@ -64,10 +75,10 @@ export async function middleware(request: NextRequest) {
     }
 
     // Page requests → let through, frontend shows modal
-    return NextResponse.next();
+    return next();
   }
 
-  return NextResponse.next();
+  return next();
 }
 
 export const config = {

@@ -5,6 +5,7 @@
  * claims, lease generations, event ordering, cancellation, and conversation
  * recovery. A client connection is never part of the execution lifetime.
  */
+import { runWithUsageOwner } from '@/lib/server/usage-storage';
 import { randomUUID } from 'node:crypto';
 import { Session, type AgentEvent, type AgentMessage } from '@earendil-works/pi-agent-core';
 import {
@@ -68,6 +69,8 @@ import {
   findSkill,
   listSkills,
   skillReadFromTranscript,
+  combineWidgetCraft,
+  widgetCraftSkillsFromTranscript,
   type LoadedSkill,
 } from './skills';
 import { registerSessionUrls } from './session-urls';
@@ -887,6 +890,11 @@ function leaseMatches(
 // finally blocks pair every timer, subscription, and agent listener with the
 // exact lifetime in which it can fire.
 export async function runSession(ctx: RunContext, meta: ClaimedAgentSession): Promise<void> {
+  // Fork: AI usage during this run belongs to the session's owner.
+  return runWithUsageOwner(meta.ownerId, () => runSessionForOwner(ctx, meta));
+}
+
+async function runSessionForOwner(ctx: RunContext, meta: ClaimedAgentSession): Promise<void> {
   const id = meta.id;
   const attempt = meta.attempt;
   const claimSeq = meta.claimSeq;
@@ -1181,7 +1189,26 @@ export async function runSession(ctx: RunContext, meta: ClaimedAgentSession): Pr
     if (meta.skillId && !requestedSkill) {
       throw new Error(`session skill "${meta.skillId}" is unavailable for its owner`);
     }
-    let activeSkill = requestedSkill ?? skillReadFromTranscript(historyMessages, installedSkills);
+    // Fork: a design-only skill (page guidance, no course structure, e.g.
+    // /nie-design) does not lock the course plan, so a course-design skill named
+    // beside it (e.g. /immersive-interactive) still plans and checks the outline.
+    const requestedLocksCourse =
+      !!requestedSkill && !(requestedSkill.widgetCraft && requestedSkill.constraints === null);
+    let activeSkill = requestedLocksCourse
+      ? requestedSkill
+      : (skillReadFromTranscript(historyMessages, installedSkills) ?? requestedSkill);
+    // Fork: interactive build guidance sticks once a skill carrying it is used,
+    // even after the agent reads a guidance-free skill such as stage-design.
+    // Several can be on at once (e.g. /nie-design for the look plus
+    // /immersive-interactive for depth); each contributes its own guidance.
+    const widgetCraftSkills = new Map<string, LoadedSkill>();
+    const noteWidgetCraft = (skill: LoadedSkill | null | undefined): void => {
+      if (skill?.widgetCraft) widgetCraftSkills.set(skill.id, skill);
+    };
+    for (const skill of widgetCraftSkillsFromTranscript(historyMessages, installedSkills)) {
+      noteWidgetCraft(skill);
+    }
+    noteWidgetCraft(requestedSkill);
     let userFramesSeen = 0;
     let turnPinnedSkill: LoadedSkill | null = null;
     let pinValidThrough = -1;
@@ -1189,12 +1216,15 @@ export async function runSession(ctx: RunContext, meta: ClaimedAgentSession): Pr
       turnPinnedSkill && userFramesSeen <= pinValidThrough ? turnPinnedSkill : null;
     const skillReadTool = installedSkills.length
       ? createNativeSkillReadTool(installedSkills, (selected) => {
-          if (!requestedSkill && !pinnedForCurrentTurn()) activeSkill = selected;
+          noteWidgetCraft(selected);
+          if (!requestedLocksCourse && !pinnedForCurrentTurn()) activeSkill = selected;
         })
       : null;
 
     const adoptPreload = (preload: SkillPreload, deliversUserFrame: boolean): void => {
-      if (requestedSkill) return;
+      // Fork: every named skill's page guidance applies, even beside a locked skill.
+      for (const named of preload.requested) noteWidgetCraft(named);
+      if (requestedLocksCourse) return;
       const target = preloadConstraintTarget(preload.requested);
       turnPinnedSkill = target && target.constraints !== null ? target : null;
       pinValidThrough = userFramesSeen + (deliversUserFrame ? 1 : 0);
@@ -1364,6 +1394,7 @@ export async function runSession(ctx: RunContext, meta: ClaimedAgentSession): Pr
       sessionId: id,
       abortSignal: abort.signal,
       getActiveSkill: () => activeSkill,
+      getWidgetCraft: () => combineWidgetCraft([...widgetCraftSkills.values()]),
     });
     const curriculumTools = buildCurriculumTools({
       store: ownerScopedStore,

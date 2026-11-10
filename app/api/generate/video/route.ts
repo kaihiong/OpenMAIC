@@ -29,6 +29,7 @@ import {
 } from '@/lib/server/provider-config';
 import type { VideoProviderId, VideoGenerationOptions } from '@/lib/media/types';
 import { createLogger } from '@/lib/logger';
+import { isVideoGenerationEnabled } from '@/lib/config/feature-flags';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
 
@@ -37,6 +38,9 @@ const log = createLogger('VideoGeneration API');
 export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
+  if (!isVideoGenerationEnabled()) {
+    return apiError('PROVIDER_DISABLED', 403, 'Video generation is disabled on this deployment');
+  }
   try {
     const body = (await request.json()) as VideoGenerationOptions;
 

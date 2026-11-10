@@ -61,6 +61,8 @@
  * like the other two.
  */
 
+import Link from 'next/link';
+import { useNieAuth } from '@/lib/hooks/use-nie-auth';
 import {
   useCallback,
   useEffect,
@@ -87,6 +89,7 @@ import {
   RefreshCw,
   Search,
   Settings,
+  ShieldCheck,
   Trash2,
   Upload,
   X,
@@ -261,6 +264,9 @@ export function WorkspaceRail({
   const [folderToDelete, setFolderToDelete] = useState<{ id: string; name: string } | null>(null);
   /** The model/provider settings dialog, opened from the rail's foot cluster. */
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Fork: administrators get an Admin entry beside Settings (server-checked). */
+  const { user: nieUser } = useNieAuth();
+  const isAdmin = nieUser?.isAdmin === true;
 
   /**
    * Commit a folder rename. Returns null when it landed and a readable message
@@ -618,6 +624,7 @@ export function WorkspaceRail({
     return (
       <nav
         data-testid="pro-nav-rail-mini"
+        data-pro-morph="rail"
         aria-label={t('workspace.navAria')}
         className="ws-rail ws-mini relative z-10 hidden h-full shrink-0 flex-col items-center md:flex"
       >
@@ -695,6 +702,17 @@ export function WorkspaceRail({
           >
             <Settings className="size-4" aria-hidden="true" />
           </button>
+          {isAdmin && (
+            <Link
+              href="/admin"
+              data-testid="pro-nav-admin-mini"
+              aria-label="Admin"
+              title="Admin"
+              className="ws-mini-btn"
+            >
+              <ShieldCheck className="size-4" aria-hidden="true" />
+            </Link>
+          )}
         </div>
       </nav>
     );
@@ -833,6 +851,7 @@ export function WorkspaceRail({
   return (
     <nav
       data-testid="pro-nav-rail"
+      data-pro-morph="rail"
       aria-label={t('workspace.navAria')}
       // `z-10`: the resize handle straddles the rail's right edge, and the
       // panes are later positioned siblings — without a stacking order the
@@ -1189,7 +1208,7 @@ export function WorkspaceRail({
         ) : null}
       </div>
 
-      <RailUtilities onOpenSettings={() => setSettingsOpen(true)} />
+      <RailUtilities onOpenSettings={() => setSettingsOpen(true)} isAdmin={isAdmin} />
 
       {resizeHandle}
 
@@ -2066,7 +2085,14 @@ function SessionDot({ status }: { readonly status: ProHomeSessionItem['status'] 
  * belongs to the community dialog), so there is nothing to cluster here for
  * notifications.
  */
-function RailUtilities({ onOpenSettings }: { readonly onOpenSettings: () => void }) {
+function RailUtilities({
+  onOpenSettings,
+  isAdmin = false,
+}: {
+  readonly onOpenSettings: () => void;
+  /** Fork: show the Admin entry (server-decided, re-checked by /admin). */
+  readonly isAdmin?: boolean;
+}) {
   const { t } = useI18n();
   return (
     <div className="shrink-0" data-testid="pro-rail-utilities">
@@ -2087,6 +2113,17 @@ function RailUtilities({ onOpenSettings }: { readonly onOpenSettings: () => void
         >
           <Settings className="size-4" aria-hidden="true" />
         </button>
+        {isAdmin && (
+          <Link
+            href="/admin"
+            data-testid="pro-nav-admin"
+            aria-label="Admin"
+            title="Admin"
+            className="ws-util-btn"
+          >
+            <ShieldCheck className="size-4" aria-hidden="true" />
+          </Link>
+        )}
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import { formatSearchResultsAsContext, searchWeb } from '@/lib/web-search';
 import {
   isServerConfiguredProvider,
   isServerProviderDisabled,
+  isServerProvidersOnly,
   resolveServerWebSearchProviderId,
   resolveWebSearchApiKey,
   resolveWebSearchModel,
@@ -74,6 +75,16 @@ export async function POST(req: NextRequest) {
         `Using server-configured web search provider "${serverProviderId}" instead of "${providerId}"`,
       );
       providerId = serverProviderId;
+    }
+
+    // Fork: in server-providers-only mode only server-managed providers run
+    // (no key-less scraping, no user-supplied keys or endpoints).
+    if (isServerProvidersOnly() && !isServerConfiguredProvider('webSearch', providerId)) {
+      return apiError(
+        'PROVIDER_DISABLED',
+        403,
+        'Only server-managed web search providers are available on this deployment',
+      );
     }
 
     // Enforce server precedence: a force-disabled provider is off for everyone,

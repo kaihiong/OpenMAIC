@@ -17,6 +17,8 @@ export interface AgentSkillInfo {
   description: string;
   hasConstraints: boolean;
   source: 'builtin' | 'user';
+  /** Fork: who made a builtin skill, e.g. "NIE" (drives the NIE badge). */
+  publisher?: string;
 }
 
 interface RegistrySnapshot {

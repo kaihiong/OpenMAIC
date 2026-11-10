@@ -23,6 +23,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Download, Loader2, Sparkles, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { NieSkillBadge } from '@/components/workbench/nie-skill-badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,6 +77,7 @@ function SkillBadges({ skill }: { skill: AgentSkillInfo }) {
   const { t } = useI18n();
   return (
     <>
+      <NieSkillBadge skill={skill} />
       <span className="shrink-0 rounded bg-primary/10 px-1.5 py-px text-[10px] font-medium text-primary">
         {skill.source === 'user'
           ? t('settings.skills.badgeOwner')

@@ -131,6 +131,12 @@ export interface SettingsState {
       customModels?: Array<{ id: string; name: string }>;
       providerOptions?: Record<string, unknown>;
       isServerConfigured?: boolean;
+      /** Models the server pins (`TTS_<PREFIX>_MODELS`); the first one is used. */
+      serverModels?: string[];
+      /** Name the server asks users to see (`TTS_<PREFIX>_DISPLAY_NAME`). */
+      serverDisplayName?: string;
+      /** Logo the server picks (e.g. Azure for an Azure-hosted OpenAI TTS). */
+      serverIcon?: string;
       /** Admin/server-level force-off (server-providers.yml / env). Overrides `enabled`. */
       serverDisabled?: boolean;
       // Custom provider fields
@@ -152,6 +158,12 @@ export interface SettingsState {
       customModels?: Array<{ id: string; name: string }>;
       providerOptions?: Record<string, unknown>;
       isServerConfigured?: boolean;
+      /** Models the server allows (`ASR_<PREFIX>_MODELS`); the first is the default. */
+      serverModels?: string[];
+      /** Name the server asks users to see (`ASR_<PREFIX>_DISPLAY_NAME`). */
+      serverDisplayName?: string;
+      /** Logo the server picks (e.g. Azure for an Azure-hosted OpenAI ASR). */
+      serverIcon?: string;
       /** Admin/server-level force-off (server-providers.yml / env). Overrides `enabled`. */
       serverDisabled?: boolean;
       // Custom provider fields
@@ -190,6 +202,8 @@ export interface SettingsState {
       baseUrl: string;
       enabled: boolean;
       isServerConfigured?: boolean;
+      /** Name the server asks users to see (`IMAGE_<PREFIX>_DISPLAY_NAME`). */
+      serverDisplayName?: string;
       /** Admin/server-level force-off (server-providers.yml / env). Overrides `enabled`. */
       serverDisabled?: boolean;
       customModels?: Array<{ id: string; name: string }>;
@@ -243,6 +257,10 @@ export interface SettingsState {
   // Server-configured opt-in parallel scene-content concurrency (#572).
   // 0 = off (serial generation); populated by fetchServerProviders.
   parallelSceneConcurrency: number;
+
+  // Server-providers-only mode: settings lists only server-managed providers
+  // and offers no way to add one. Populated by fetchServerProviders.
+  serverProvidersOnly: boolean;
 
   // Auto-config lifecycle flag (persisted)
   autoConfigApplied: boolean;
@@ -988,6 +1006,7 @@ export const useSettingsStore = create<SettingsState>()(
 
         // Off until the server reports a concurrency via fetchServerProviders.
         parallelSceneConcurrency: 0,
+        serverProvidersOnly: false,
 
         autoConfigApplied: false,
 
@@ -1488,11 +1507,21 @@ export const useSettingsStore = create<SettingsState>()(
             // capability section carries an optional `disabled` flag for
             // admin/server-level force-off (#665).
             const data = (await res.json()) as {
-              providers: Record<string, { models?: string[] }>;
-              tts: Record<string, { disabled?: boolean }>;
-              asr: Record<string, { disabled?: boolean }>;
+              providers: Record<string, { models?: string[]; displayName?: string }>;
+              serverProvidersOnly?: boolean;
+              tts: Record<
+                string,
+                { disabled?: boolean; models?: string[]; displayName?: string; icon?: string }
+              >;
+              asr: Record<
+                string,
+                { disabled?: boolean; models?: string[]; displayName?: string; icon?: string }
+              >;
               pdf: Record<string, Record<string, never>>;
-              image: Record<string, { models?: string[]; disabled?: boolean }>;
+              image: Record<
+                string,
+                { models?: string[]; disabled?: boolean; displayName?: string }
+              >;
               video: Record<string, { models?: string[]; disabled?: boolean }>;
               webSearch: Record<string, { disabled?: boolean }>;
               generation?: { parallelSceneConcurrency?: number };
@@ -1507,6 +1536,8 @@ export const useSettingsStore = create<SettingsState>()(
                 if (newProvidersConfig[key]) {
                   newProvidersConfig[key] = {
                     ...newProvidersConfig[key],
+                    // Undo a server display name the server no longer sends.
+                    name: PROVIDERS[key]?.name ?? newProvidersConfig[key].name,
                     isServerConfigured: false,
                     serverModels: undefined,
                   };
@@ -1543,6 +1574,7 @@ export const useSettingsStore = create<SettingsState>()(
                     : currentModels;
                   newProvidersConfig[key] = {
                     ...newProvidersConfig[key],
+                    ...(info.displayName && { name: info.displayName }),
                     isServerConfigured: true,
                     serverModels: info.models,
                     models: filteredModels,
@@ -1560,6 +1592,9 @@ export const useSettingsStore = create<SettingsState>()(
                   newTTSConfig[key] = {
                     ...newTTSConfig[key],
                     isServerConfigured: false,
+                    serverModels: undefined,
+                    serverDisplayName: undefined,
+                    serverIcon: undefined,
                     serverDisabled: false,
                   };
                 }
@@ -1570,7 +1605,12 @@ export const useSettingsStore = create<SettingsState>()(
                   newTTSConfig[key] = {
                     ...newTTSConfig[key],
                     isServerConfigured: !info.disabled,
+                    serverModels: info.models,
+                    serverDisplayName: info.displayName,
+                    serverIcon: info.icon,
                     serverDisabled: info.disabled === true,
+                    // A pinned model is the one the server will use anyway.
+                    ...(info.models?.length ? { modelId: info.models[0] } : {}),
                   };
                 }
               }
@@ -1585,6 +1625,9 @@ export const useSettingsStore = create<SettingsState>()(
                   newASRConfig[key] = {
                     ...newASRConfig[key],
                     isServerConfigured: false,
+                    serverModels: undefined,
+                    serverDisplayName: undefined,
+                    serverIcon: undefined,
                     serverDisabled: false,
                   };
                 }
@@ -1592,10 +1635,18 @@ export const useSettingsStore = create<SettingsState>()(
               for (const [pid, info] of Object.entries(data.asr || {})) {
                 const key = pid as ASRProviderId;
                 if (newASRConfig[key]) {
+                  const currentModel = newASRConfig[key].modelId;
                   newASRConfig[key] = {
                     ...newASRConfig[key],
                     isServerConfigured: !info.disabled,
+                    serverModels: info.models,
+                    serverDisplayName: info.displayName,
+                    serverIcon: info.icon,
                     serverDisabled: info.disabled === true,
+                    // Keep a saved model only if the server still offers it.
+                    ...(info.models?.length && !info.models.includes(currentModel ?? '')
+                      ? { modelId: info.models[0] }
+                      : {}),
                   };
                 }
               }
@@ -1631,6 +1682,7 @@ export const useSettingsStore = create<SettingsState>()(
                   newImageConfig[key] = {
                     ...newImageConfig[key],
                     isServerConfigured: false,
+                    serverDisplayName: undefined,
                     serverDisabled: false,
                   };
                 }
@@ -1641,6 +1693,7 @@ export const useSettingsStore = create<SettingsState>()(
                   newImageConfig[key] = {
                     ...newImageConfig[key],
                     isServerConfigured: !info.disabled,
+                    serverDisplayName: info.displayName,
                     serverDisabled: info.disabled === true,
                     ...(info.models?.length
                       ? {
@@ -1726,34 +1779,64 @@ export const useSettingsStore = create<SettingsState>()(
                   .map(([id]) => id as T),
               ];
 
-              const llmFallback = buildFallback<ProviderId>(newProvidersConfig);
-              const ttsFallback = buildFallback<TTSProviderId>(newTTSConfig);
-              const asrFallback = buildFallback<ASRProviderId>(newASRConfig);
-              const pdfFallback = buildFallback<PDFProviderId>(newPDFConfig);
+              // Server-providers-only mode: a provider the server does not manage
+              // is not selectable, so a saved choice of one falls back to a
+              // server-managed provider.
+              const llmSelectable = data.serverProvidersOnly
+                ? (Object.fromEntries(
+                    Object.entries(newProvidersConfig).filter(([, c]) => c?.isServerConfigured),
+                  ) as typeof newProvidersConfig)
+                : newProvidersConfig;
+              const llmFallback = buildFallback<ProviderId>(llmSelectable);
+              const ttsSelectable = data.serverProvidersOnly
+                ? (Object.fromEntries(
+                    Object.entries(newTTSConfig).filter(
+                      ([id, c]) => c?.isServerConfigured || id === 'browser-native-tts',
+                    ),
+                  ) as typeof newTTSConfig)
+                : newTTSConfig;
+              const ttsFallback = buildFallback<TTSProviderId>(ttsSelectable);
+              const asrSelectable = data.serverProvidersOnly
+                ? (Object.fromEntries(
+                    Object.entries(newASRConfig).filter(
+                      ([id, c]) => c?.isServerConfigured || id === 'browser-native',
+                    ),
+                  ) as typeof newASRConfig)
+                : newASRConfig;
+              const asrFallback = buildFallback<ASRProviderId>(asrSelectable);
+              const pdfSelectable = data.serverProvidersOnly
+                ? (Object.fromEntries(
+                    Object.entries(newPDFConfig).filter(
+                      ([id, c]) => c?.isServerConfigured || id === 'unpdf',
+                    ),
+                  ) as typeof newPDFConfig)
+                : newPDFConfig;
+              const pdfFallback = buildFallback<PDFProviderId>(pdfSelectable);
               const imageFallback = buildFallback<ImageProviderId>(newImageConfig);
               const videoFallback = buildFallback<VideoProviderId>(newVideoConfig);
-              const webSearchFallback = buildWebSearchFallbackOrder(newWebSearchConfig);
+              const webSearchSelectable = data.serverProvidersOnly
+                ? (Object.fromEntries(
+                    Object.entries(newWebSearchConfig).filter(([, c]) => c?.isServerConfigured),
+                  ) as typeof newWebSearchConfig)
+                : newWebSearchConfig;
+              const webSearchFallback = buildWebSearchFallbackOrder(webSearchSelectable);
 
-              let validLLMProvider = validateProvider(
-                state.providerId,
-                newProvidersConfig,
-                llmFallback,
-              );
+              let validLLMProvider = validateProvider(state.providerId, llmSelectable, llmFallback);
               const validTTSProvider = validateProvider(
                 state.ttsProviderId,
-                newTTSConfig,
+                ttsSelectable,
                 ttsFallback,
                 'browser-native-tts' as TTSProviderId,
               );
               const validASRProvider = validateProvider(
                 state.asrProviderId,
-                newASRConfig,
+                asrSelectable,
                 asrFallback,
                 'browser-native' as ASRProviderId,
               );
               const validPDFProvider = validateProvider(
                 state.pdfProviderId,
-                newPDFConfig,
+                pdfSelectable,
                 pdfFallback,
                 'unpdf' as PDFProviderId,
               );
@@ -1769,7 +1852,7 @@ export const useSettingsStore = create<SettingsState>()(
               );
               const validWebSearchProvider = validateProvider(
                 state.webSearchProviderId,
-                newWebSearchConfig,
+                webSearchSelectable,
                 webSearchFallback,
                 'tavily' as WebSearchProviderId,
               );
@@ -1941,6 +2024,7 @@ export const useSettingsStore = create<SettingsState>()(
                   0,
                   Math.floor(data.generation?.parallelSceneConcurrency ?? 0),
                 ),
+                serverProvidersOnly: data.serverProvidersOnly === true,
                 autoConfigApplied: true,
                 // Validated selections
                 ...(validLLMProvider !== state.providerId && {

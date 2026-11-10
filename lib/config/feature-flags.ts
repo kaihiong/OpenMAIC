@@ -147,6 +147,26 @@ export function isVideoExportEnabled(): boolean {
   return readBoolean(process.env.NEXT_PUBLIC_ENABLE_VIDEO_EXPORT);
 }
 
+/**
+ * Token Plan settings page (one-click MiniMax / Volcengine Ark plan presets).
+ * Default OFF in this fork: NIE deployments configure providers server-side,
+ * so the page only adds choices nobody here uses. Set to "true" to show it.
+ */
+export function isTokenPlanEnabled(): boolean {
+  return readBoolean(process.env.NEXT_PUBLIC_TOKEN_PLAN_ENABLED);
+}
+
+/**
+ * Video generation. Default OFF in this fork: NIE does not allow video, so the
+ * settings page, the media picker tab, the /api/generate/video route, video
+ * scenes in outlines and the agent's generate_video tool are all off unless this
+ * is "true". NEXT_PUBLIC values are inlined into server code too, so the same
+ * switch gates both sides.
+ */
+export function isVideoGenerationEnabled(): boolean {
+  return readBoolean(process.env.NEXT_PUBLIC_VIDEO_GENERATION_ENABLED);
+}
+
 /** Experimental PPTX import entry point. Default OFF. */
 export function isPptxImportEnabled(): boolean {
   return readBoolean(process.env.NEXT_PUBLIC_ENABLE_PPTX_IMPORT);

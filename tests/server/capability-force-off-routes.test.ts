@@ -212,6 +212,31 @@ describe('capability force-off route guards (#665)', () => {
   });
 
   describe('video', () => {
+    // Fork: video generation is off unless NEXT_PUBLIC_VIDEO_GENERATION_ENABLED
+    // is set. These upstream guards are exercised with it switched on.
+    beforeEach(() => {
+      vi.stubEnv('NEXT_PUBLIC_VIDEO_GENERATION_ENABLED', 'true');
+    });
+
+    it('POST /api/generate/video returns 403 when video generation is switched off', async () => {
+      vi.stubEnv('NEXT_PUBLIC_VIDEO_GENERATION_ENABLED', '');
+      vi.stubEnv('VIDEO_GROK_API_KEY', 'xai-video');
+      const { POST } = await import('@/app/api/generate/video/route');
+
+      const res = await POST(
+        jsonRequest(
+          'http://localhost/api/generate/video',
+          { prompt: 'a cat' },
+          { 'x-video-provider': 'grok-video' },
+        ),
+      );
+      const json = await res.json();
+
+      expect(res.status).toBe(403);
+      expect(json).toMatchObject({ success: false, errorCode: 'PROVIDER_DISABLED' });
+      expect(mocks.generateVideo).not.toHaveBeenCalled();
+    });
+
     it('POST /api/generate/video returns 403 PROVIDER_DISABLED for a force-disabled provider', async () => {
       vi.stubEnv('VIDEO_GROK_API_KEY', 'xai-video');
       vi.stubEnv('VIDEO_GROK_ENABLED', 'false');

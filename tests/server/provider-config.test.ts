@@ -158,6 +158,62 @@ describe('provider-config', () => {
     });
   });
 
+  // Fork addition: NIE users may only use server-managed providers.
+  describe('server-providers-only mode', () => {
+    it('ignores a client key and base URL for an unmanaged provider', async () => {
+      vi.stubEnv('OPENMAIC_SERVER_PROVIDERS_ONLY', 'true');
+      const { resolveApiKey, resolveBaseUrl } = await import('@/lib/server/provider-config');
+      expect(resolveApiKey('openai', 'sk-client')).toBe('');
+      expect(resolveBaseUrl('openai', 'https://attacker.example/v1')).toBeUndefined();
+    });
+
+    it('still uses the server key for a managed provider', async () => {
+      vi.stubEnv('OPENMAIC_SERVER_PROVIDERS_ONLY', 'true');
+      vi.stubEnv('AZURE_OPENAI_API_KEY', 'azure-key');
+      const { resolveApiKey } = await import('@/lib/server/provider-config');
+      expect(resolveApiKey('azure-openai', 'sk-client')).toBe('azure-key');
+    });
+
+    it('is off unless set to true or 1', async () => {
+      vi.stubEnv('OPENMAIC_SERVER_PROVIDERS_ONLY', 'yes');
+      const { isServerProvidersOnly, resolveApiKey } = await import('@/lib/server/provider-config');
+      expect(isServerProvidersOnly()).toBe(false);
+      expect(resolveApiKey('openai', 'sk-client')).toBe('sk-client');
+    });
+
+    it('exposes a display name for the Azure image provider that reuses the LLM key', async () => {
+      vi.stubEnv('AZURE_OPENAI_API_KEY', 'azure-key');
+      vi.stubEnv('AZURE_OPENAI_BASE_URL', 'https://example.openai.azure.com/openai/v1');
+      vi.stubEnv('IMAGE_AZURE_OPENAI_DISPLAY_NAME', 'Azure OpenAI (NIE Environment)');
+      const { getServerImageProviders } = await import('@/lib/server/provider-config');
+      expect(getServerImageProviders()['azure-openai-image']?.displayName).toBe(
+        'Azure OpenAI (NIE Environment)',
+      );
+    });
+
+    it('exposes TTS models, display name and the Azure icon for an Azure-hosted OpenAI TTS', async () => {
+      vi.stubEnv('TTS_OPENAI_API_KEY', 'azure-key');
+      vi.stubEnv('TTS_OPENAI_BASE_URL', 'https://example.openai.azure.com/openai/v1');
+      vi.stubEnv('TTS_OPENAI_MODELS', 'tts-hd');
+      vi.stubEnv('TTS_OPENAI_DISPLAY_NAME', 'Azure OpenAI (NIE Environment)');
+      const { getServerTTSProviders } = await import('@/lib/server/provider-config');
+      expect(getServerTTSProviders()['openai-tts']).toEqual({
+        models: ['tts-hd'],
+        displayName: 'Azure OpenAI (NIE Environment)',
+        icon: '/logos/azure.svg',
+      });
+    });
+
+    it('exposes a configured display name for a server provider', async () => {
+      vi.stubEnv('AZURE_OPENAI_API_KEY', 'azure-key');
+      vi.stubEnv('AZURE_OPENAI_DISPLAY_NAME', 'Azure OpenAI (NIE Environment)');
+      const { getServerProviders } = await import('@/lib/server/provider-config');
+      expect(getServerProviders()['azure-openai']?.displayName).toBe(
+        'Azure OpenAI (NIE Environment)',
+      );
+    });
+  });
+
   describe('getParallelSceneConcurrency', () => {
     beforeEach(() => {
       delete process.env.PARALLEL_SCENE_CONCURRENCY;
