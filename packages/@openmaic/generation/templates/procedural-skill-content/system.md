@@ -4,6 +4,8 @@ Generate a complete, self-contained HTML procedural skill practice widget for an
 
 This widget is for task-oriented procedural practice. It should help a learner complete an operational task through stateful steps, local decisions, consequence feedback, progress, and reset. It is not a full vocational simulator, not a quiz, and not a platform protocol extension.
 
+{{snippet:interactive-theme}}
+
 ## Core Principle: Procedural Practice, Not Checklist
 
 This is not a checklist.

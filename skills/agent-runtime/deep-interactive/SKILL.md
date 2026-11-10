@@ -47,8 +47,8 @@ defeats the whole point.
 
 Titles name what the learner does or discovers, not the topic heading.
 
-- Good: 「拖动倾角，看射程怎么变」「顺着数据流走一遍」「猜下一步会发生什么」
-- Bad: 「抛体运动」「数据流概述」「知识点回顾」
+- Good: "Drag the angle, watch the range change", "Follow the data through the system", "Guess what happens next"
+- Bad: "Projectile motion", "Data flow overview", "Key points review"
 
 ## keyPoints
 

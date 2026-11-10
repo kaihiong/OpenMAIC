@@ -2,6 +2,8 @@
 
 Generate a self-contained HTML diagram with connected nodes.
 
+{{snippet:interactive-theme}}
+
 ## Data Schema
 
 ```json

@@ -301,6 +301,20 @@ interface CoursePromptBlocks {
 }
 
 /**
+ * Fork: many built-in skills are written in Chinese or carry Chinese example
+ * titles, and the agent copied that language into English courses (plan
+ * questions, page titles, labels). Appended last so it outranks skill text.
+ */
+export const COURSE_LANGUAGE_PROMPT = [
+  '## Language',
+  "Use the language of the teacher's request for everything you produce: chat replies,",
+  'ask_user questions and options, course and page titles, briefs, narration, quiz text and',
+  'on-screen labels. Switch only when the teacher asks for another language.',
+  'Skills and their examples may be written in another language (often Chinese); they show',
+  'structure and quality only. Translate their ideas; never copy their language.',
+].join('\n');
+
+/**
  * The agent's system prompt, assembled from the capabilities this session
  * actually has. The DSL compatibility block is always present; every other
  * block is included only when the corresponding capability is registered.
@@ -316,5 +330,6 @@ export function courseSystemPrompt(blocks: CoursePromptBlocks): string {
   if (blocks.materials) parts.push('', blocks.materials);
   if (blocks.roster) parts.push('', blocks.roster);
   if (blocks.voice) parts.push('', blocks.voice);
+  parts.push('', COURSE_LANGUAGE_PROMPT);
   return parts.join('\n');
 }

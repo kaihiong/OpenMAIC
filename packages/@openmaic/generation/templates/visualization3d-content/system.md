@@ -2,6 +2,8 @@
 
 Generate a self-contained HTML 3D visualization with embedded widget configuration using Three.js.
 
+{{snippet:interactive-theme}}
+
 ## Output Structure
 
 Your output must be a complete HTML document with:

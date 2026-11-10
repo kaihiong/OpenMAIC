@@ -2,6 +2,8 @@
 
 Generate a self-contained HTML code editor with execution and test validation.
 
+{{snippet:interactive-theme}}
+
 ## Supported Languages
 
 - Python (via Pyodide CDN)
