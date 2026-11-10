@@ -46,8 +46,11 @@ jobs:
           # Next.js resolves headers() at build time into routes-manifest.json,
           # so the frame-ancestors allow-list has to be baked in here. A runtime
           # env var on the container app has no effect.
+          # NEXT_PUBLIC_* flags are inlined into the client bundle at build time too.
           build-args: |
             ALLOWED_FRAME_ANCESTORS=http://localhost:8001 https://aiworkspace.nie.edu.sg https://aiworkspace.stg.nie.edu.sg https://aiworkspace.dev.nie.edu.sg
+            NEXT_PUBLIC_PRO_WORKBENCH_ENABLED=true
+            NEXT_PUBLIC_PERSISTENCE=1
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

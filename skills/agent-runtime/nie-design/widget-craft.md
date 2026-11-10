@@ -48,10 +48,10 @@ a long web page** — the learner must see the whole activity at once without sc
 ```html
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.1.11"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&display=block">
 ```
 
 #### CDN rules
@@ -283,18 +283,35 @@ document.querySelectorAll('input[type="range"]').forEach(function (el) {
 - Labels read as actions in Title Case on buttons ("Start Simulation", "Reset", "Check Answer");
   an action keeps its name through the flow.
 
-#### Icons (Font Awesome 6)
+#### Icons (Material Symbols Outlined)
 
-- Use Font Awesome for every icon: `<i class="fa-solid fa-play" aria-hidden="true"></i>`.
-  Do not use emoji as UI icons.
-- This is Font Awesome **Free**: always use `fa-solid`. Never use `fa-regular`, `fa-light`,
-  `fa-thin`, `fa-duotone` or `fa-sharp` — most of those are Pro-only and render as an empty
-  space (e.g. `fa-regular fa-circle-info` shows nothing). `fa-brands` is only for brand logos.
-  For a quieter, secondary icon, keep `fa-solid` and lower its colour to `--label-2`.
-- Size icons to match adjacent text (`text-[15px]`–`text-[17px]`).
-- Common mapping: play `fa-play`, pause `fa-pause`, reset `fa-rotate-left`, next `fa-chevron-right`,
-  hint `fa-lightbulb`, correct `fa-circle-check`, wrong `fa-circle-xmark`, info `fa-circle-info`,
-  settings `fa-sliders`, expand `fa-up-right-and-down-left-from-center`, zoom `fa-magnifying-glass-plus` / `fa-magnifying-glass-minus`.
+The same icon set as NIE ALEX+ Courses. Use it for every icon; do not use emoji or any other
+icon font as UI icons.
+
+- Markup: `<span class="material-symbols-outlined" aria-hidden="true">play_arrow</span>`.
+  The text inside is the icon's ligature name (lowercase, underscores). Use only real Material
+  Symbols names; an unknown name renders as its literal text.
+- Add this CSS once (it matches ALEX+):
+
+```css
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal; font-style: normal; line-height: 1;
+  letter-spacing: normal; text-transform: none; white-space: nowrap; direction: ltr;
+  display: inline-block; vertical-align: middle;
+  font-size: 20px;
+  -webkit-font-feature-settings: "liga"; -webkit-font-smoothing: antialiased;
+}
+```
+- Load the font exactly as in the `<head>` above (the plain family, one style). Never request
+  the variable axes (`opsz,wght,FILL,GRAD@...`) or use `font-variation-settings`: that file is
+  several MB and in the classroom frame it often never finishes, leaving icon names as text.
+- Size icons to match adjacent text (18–22px via `font-size`). Show an active/selected state
+  with colour or a tinted background, not a filled icon. Colour with `var(--accent)`, or
+  `var(--label-2)` for a quieter icon.
+- Common mapping: play `play_arrow`, pause `pause`, reset `restart_alt`, next `chevron_right`,
+  previous `chevron_left`, hint `lightbulb`, correct `check_circle`, wrong `cancel`, info `info`,
+  settings `tune`, expand `open_in_full`, zoom `zoom_in` / `zoom_out`, help `help`, close `close`.
 - An icon-only button must carry `aria-label` text.
 
 #### Motion
